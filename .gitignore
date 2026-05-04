@@ -28,10 +28,8 @@ View/.env.*
 Thumbs.db
 
 # Optional local docs / agent notes
-Codex/Project_Context.md
-Codex/Todo.md
-Codex/Codex.md
-md/
+Codex/
+
 ### STS ###
 .apt_generated
 .classpath

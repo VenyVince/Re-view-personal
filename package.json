@@ -13,5 +13,8 @@
     "react-infinite-scroll-component": "^6.1.1",
     "react-router-dom": "^7.9.5",
     "styled-components": "^6.1.19"
+  },
+  "devDependencies": {
+    "baseline-browser-mapping": "^2.10.27"
   }
 }
