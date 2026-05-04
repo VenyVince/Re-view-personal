@@ -8,7 +8,9 @@
   | Review 문서     | https://github.com/VenyVince/5.Re_View_Doc |
   | Review 시연 영상  | https://www.youtube.com/watch?v=kP2HrcrGmvU |
 ---
-
+## Dev Log
+- Day 1: 초기 실행 및 환경 문제 정리 → logs/Daily/Day1.md
+---
 ## 프로젝트 소개
 
 Re_View는 사용자 리뷰와 Baumann 피부 타입 데이터를 기반으로 스킨케어 상품과 리뷰를 추천하는 풀스택 웹 서비스입니다.
