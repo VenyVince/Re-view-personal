@@ -19,6 +19,7 @@ Day 2의 우선 목표는 Docker 이미지에 `.env`가 포함되지 않도록 �
 | `infra/.env.example` 추가 | 완료 | 실제 비밀번호 없이 placeholder 값 사용 |
 | 로컬/Docker 환경 변수 구분 | 반영 | Docker Compose 기준 값과 로컬 개발용 예시를 분리 |
 | Docker Compose 런타임 env 주입 | 유지 | `infra/docker-compose.yml`의 `env_file: .env` 구조 유지 |
+| MinIO URL 분리 | 후속 작업 | 2주 이후 계획으로 이동 |
 
 ## 1. Dockerfile 정리
 
@@ -90,14 +91,15 @@ REACT_APP_API_BASE_URL=http://localhost:8080
 # MINIO_PUBLIC_URL=http://localhost:9000
 ```
 
-### 2.4 주의사항
+### 2.4 결과와 주의사항
 
 - Docker Compose 실행 시 `{db_service_name}`은 실제 Compose DB 서비스명으로 바꿔야 한다.
 - Docker Compose 실행 시 `{minio_service_name}`은 실제 Compose MinIO 서비스명으로 바꿔야 한다.
 - 배포 전에는 `CORS_ALLOWED_ORIGINS`, `REACT_APP_API_BASE_URL`, `MINIO_PUBLIC_URL`을 공개 주소 기준으로 바꿔야 한다.
 - `infra/.env.example`은 예시 파일이며, 실제 실행 값은 `infra/.env`에 둔다.
+- 실제 비밀번호, MinIO root password, 운영 주소는 `.env.example`에 기록하지 않는다.
 
-## 3. 이번 커밋에서 제외할 내용
+## 3. MinIO 관련 결정
 
 MinIO 내부 URL과 공개 URL을 코드에서 분리하는 작업은 이번 커밋 범위에서 제외한다.
 
@@ -110,11 +112,45 @@ MinIO 내부 URL과 공개 URL을 코드에서 분리하는 작업은 이번 커
 추후 검토할 내용:
 
 - MinIO bucket 존재 확인 같은 작은 내부 검증 작업 추가 여부
+- 업로드 파일 검증, 이미지 리사이징, 바이러스 검사 같은 내부 보강 작업 추가 여부
 - `MINIO_URL` / `MINIO_PUBLIC_URL` 분리 코드 유지 여부
 - Docker Compose 환경에서 presigned URL host 검증
 
-## 4. 남은 확인 항목
+## 4. 검증
+
+### 4.1 파일 확인
+
+확인 결과:
+
+- 백엔드 Dockerfile에서 `.env` 복사 구문이 제거되어 있다.
+- `infra/.env.example`이 존재한다.
+- `infra/docker-compose.yml`은 계속 `env_file: .env` 방식으로 런타임 환경 변수를 주입한다.
+
+### 4.2 이번 범위에서 제외한 검증
+
+Docker Compose 전체 재기동과 presigned URL host 검증은 이번 커밋 범위에서 제외한다.
+
+이유:
+
+- MinIO 공개 URL 분리와 presigned URL 발급 구조는 2주 이후 계획으로 이동했다.
+- 현재 커밋의 목적은 Docker 이미지에 `.env`를 포함하지 않고, 필요한 환경 변수 예시를 정리하는 것이다.
+
+## 5. 남은 확인 항목
 
 - Docker Compose에서 실제 `.env` 값을 기준으로 백엔드, 프론트엔드, Oracle XE, MinIO 기동 확인
 - `infra/.env.example`의 placeholder를 실제 로컬 Docker 값으로 복사해 사용할 때 오류가 없는지 확인
 - MinIO URL 분리 관련 코드는 별도 브랜치에서 재검토
+
+## 6. 커밋 범위
+
+이번 커밋에 포함할 내용:
+
+- 백엔드 Dockerfile에서 `.env` 복사 제거
+- `infra/.env.example` 추가 및 환경 변수 예시 정리
+- Day 2 로그, 전체 계획, Todo 상태 갱신
+
+이번 커밋에 포함하지 않을 내용:
+
+- MinIO 내부 URL과 공개 URL 분리 코드
+- public endpoint 기준 presigned URL 발급 구조
+- MinIO 내부 보강 작업
