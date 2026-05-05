@@ -11,6 +11,21 @@ Day 2의 우선 목표는 Docker 이미지에 `.env`가 포함되지 않도록 �
 - `infra/.env.example`에 필요한 환경 변수 키를 민감 정보 없이 정리한다.
 - 로컬 실행용 값과 Docker Compose 실행용 값을 구분해서 기록한다.
 
+## 작업 체크리스트
+
+- [x] 백엔드 `Dockerfile`에서 `.env` 복사 구문을 확인했다.
+- [x] 백엔드 `Dockerfile`에서 `COPY infra/.env .env`를 제거했다.
+- [x] Docker 이미지가 `.env` 복사에 의존하지 않는 구조인지 확인했다.
+- [x] `infra/.env.example` 파일을 추가했다.
+- [x] `infra/.env.example`에 실제 비밀번호 없이 placeholder 값을 기록했다.
+- [x] Docker Compose 실행에 필요한 DB 환경 변수 키를 정리했다.
+- [x] Docker Compose 실행에 필요한 MinIO 환경 변수 키를 정리했다.
+- [x] CORS와 프론트 API base URL 환경 변수 키를 정리했다.
+- [x] 로컬 Maven/IntelliJ 실행용 환경 변수 예시를 Docker Compose 값과 분리했다.
+- [x] Docker Compose의 `env_file` 런타임 주입 구조를 유지했다.
+- [x] MinIO 내부 URL과 공개 URL 분리 작업을 후속 작업으로 분류했다.
+- [x] 이번 범위에 포함할 작업과 제외할 작업을 기록했다.
+
 ## 요약
 
 | 항목 | 결과 | 메모 |
@@ -140,17 +155,3 @@ Docker Compose 전체 재기동과 presigned URL host 검증은 이번 커밋 �
 - Docker Compose에서 실제 `.env` 값을 기준으로 백엔드, 프론트엔드, Oracle XE, MinIO 기동 확인
 - `infra/.env.example`의 placeholder를 실제 로컬 Docker 값으로 복사해 사용할 때 오류가 없는지 확인
 - MinIO URL 분리 관련 코드는 별도 브랜치에서 재검토
-
-## 6. 커밋 범위
-
-이번 커밋에 포함할 내용:
-
-- 백엔드 Dockerfile에서 `.env` 복사 제거
-- `infra/.env.example` 추가 및 환경 변수 예시 정리
-- Day 2 로그, 전체 계획, Todo 상태 갱신
-
-이번 커밋에 포함하지 않을 내용:
-
-- MinIO 내부 URL과 공개 URL 분리 코드
-- public endpoint 기준 presigned URL 발급 구조
-- MinIO 내부 보강 작업

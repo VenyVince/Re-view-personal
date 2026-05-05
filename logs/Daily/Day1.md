@@ -11,6 +11,21 @@ Day 1의 목표는 코드를 수정하기보다 현재 실행 상태를 확인�
 - Docker Compose 실행 상태 확인
 - 환경 변수, DB, MinIO, CORS, 포트 문제를 코드 문제와 분리해서 기록
 
+## 작업 체크리스트
+
+- [x] 백엔드 Maven 로컬 실행을 확인했다.
+- [x] `JAVA_HOME` 설정 문제를 확인하고 실제 JDK 경로를 기록했다.
+- [x] 백엔드 실행에 필요한 환경 변수 누락 문제를 확인했다.
+- [x] Oracle XE 연결과 DB 조회 API 응답을 확인했다.
+- [x] MinIO 연결과 presigned 이미지 URL 생성을 확인했다.
+- [x] 프론트엔드 로컬 dev server 실행을 확인했다.
+- [x] FE -> BE 연동 흐름과 CORS origin 설정을 확인했다.
+- [x] Docker Compose 컨테이너 기동 상태를 확인했다.
+- [x] Docker 환경 DB 연결 문제의 원인이 컨테이너 내부 `localhost` 사용임을 기록했다.
+- [x] Docker 환경 MinIO presigned URL 공개 주소 문제를 후속 안건으로 분리했다.
+- [x] 로컬 실행용 환경 변수와 Docker Compose 실행용 환경 변수를 구분해서 기록했다.
+- [x] 코드 문제와 로컬/인프라 환경 문제를 분리해서 정리했다.
+
 ## 요약
 
 | 항목 | 결과 | 메모 |
@@ -22,9 +37,9 @@ Day 1의 목표는 코드를 수정하기보다 현재 실행 상태를 확인�
 | FE -> BE 연동 | 가능 | CORS origin 설정 보정 후 로그인/상품 조회 흐름 확인 |
 | Docker Compose 실행 | 부분 통과 | 컨테이너 기동과 DB 조회 API는 통과, MinIO presigned URL 공개 주소 이슈 남음 |
 
-## 1. 백엔드 로컬 실행 확인
+### 1. 백엔드 로컬 실행 확인
 
-### 1.1 Maven으로 Spring Boot 실행
+#### 1.1 Maven으로 Spring Boot 실행
 
 실행 명령:
 
@@ -59,7 +74,7 @@ $env:JAVA_HOME='C:\Program Files\Java\jdk-21'
 - `http://localhost:8080/api/products` -> 200 OK
 - `http://localhost:8080/api/reviews` -> 200 OK
 
-### 1.2 백엔드 로컬 실행 환경 변수
+#### 1.2 백엔드 로컬 실행 환경 변수
 
 로컬 Maven/IntelliJ 실행 기준:
 
@@ -85,7 +100,7 @@ minio.bucket=review
 - Maven/IntelliJ 로컬 실행은 `infra/.env`를 자동으로 읽지 않는다.
 - IntelliJ 실행 시 Run Configuration의 Environment variables에 직접 넣거나 별도 env file 로딩 설정이 필요하다.
 
-### 1.3 Oracle XE, MinIO 연결 확인
+#### 1.3 Oracle XE, MinIO 연결 확인
 
 결과:
 
@@ -98,9 +113,9 @@ minio.bucket=review
 
 - 현재 로컬 백엔드 실행 문제는 코드 문제가 아니라 환경 변수 주입과 로컬 JDK 설정 문제로 분류한다.
 
-## 2. 프론트엔드 로컬 실행 확인
+### 2. 프론트엔드 로컬 실행 확인
 
-### 2.1 의존성 설치 여부
+#### 2.1 의존성 설치 여부
 
 위치:
 
@@ -125,7 +140,7 @@ npm start
 - React dev server 실행: 통과
 - 화면 표시: 통과
 
-### 2.3 백엔드 API 주소 설정
+#### 2.3 백엔드 API 주소 설정
 
 프론트 공통 axios 설정:
 
@@ -144,7 +159,7 @@ baseURL: process.env.REACT_APP_API_BASE_URL || "http://localhost:8080"
 - 로컬 Docker 검증에서는 브라우저 기준 주소인 `http://localhost:8080`이 더 적절하다.
 - 배포 환경에서는 공인 IP 또는 도메인 기준 URL로 별도 관리해야 한다.
 
-### 2.4 기본 흐름 확인
+#### 2.4 기본 흐름 확인
 
 결과:
 
@@ -152,9 +167,9 @@ baseURL: process.env.REACT_APP_API_BASE_URL || "http://localhost:8080"
 - 로그인 흐름: 정상 동작 확인
 - 상품 조회 흐름: 정상 동작 확인
 
-## 3. Docker Compose 실행 확인
+### 3. Docker Compose 실행 확인
 
-### 3.1 Compose 파일 확인
+#### 3.1 Compose 파일 확인
 
 파일:
 
@@ -170,7 +185,7 @@ infra/docker-compose.yml
 - 프론트엔드 서비스 있음: `fe`
 - 프론트 컨테이너 내부에서 nginx 사용
 
-### 3.2 Docker Compose 실행
+#### 3.2 Docker Compose 실행
 
 확인 결과:
 
@@ -188,7 +203,7 @@ infra/docker-compose.yml
 | `review-be` | 기동 |
 | `review-fe` | 기동 |
 
-### 3.3 Docker 환경 DB 조회 API 확인
+#### 3.3 Docker 환경 DB 조회 API 확인
 
 초기 증상:
 
@@ -232,7 +247,7 @@ SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//oracle-db:1521/XEPDB1
 - DB 스키마 문제로 단정하지 않음
 - Docker 환경 변수와 컨테이너 네트워크 주소 문제
 
-### 3.4 Docker 환경 MinIO 이미지 접근 실패
+#### 3.4 Docker 환경 MinIO 이미지 접근 실패
 
 확인 결과:
 
@@ -254,9 +269,9 @@ SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//oracle-db:1521/XEPDB1
 - 코드 문제라기보다 Docker 환경 변수 설계 문제
 - MinIO 내부 접속 URL과 클라이언트 공개 URL을 분리해야 하는 개선 안건
 
-## 4. 환경 변수 정리
+### 4. 환경 변수 정리
 
-### 4.1 로컬 Maven/IntelliJ 실행 기준
+#### 4.1 로컬 Maven/IntelliJ 실행 기준
 
 ```env
 SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//localhost:1521/XEPDB1
@@ -272,7 +287,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:3000
 REACT_APP_API_BASE_URL=http://localhost:8080
 ```
 
-### 4.2 Docker Compose 실행 기준
+#### 4.2 Docker Compose 실행 기준
 
 ```env
 SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//oracle-db:1521/XEPDB1
@@ -294,9 +309,9 @@ Caution:
 - `REACT_APP_API_BASE_URL`은 브라우저 기준의 주소.
 - 로컬 Docker 확인에서는 브라우저가 호스트에서 백엔드에 접근하므로 `http://localhost:8080`을 사용.
 
-## 5. 추가 안건 - MinIO 내부 URL과 공개 URL 분리
+### 5. 추가 안건 - MinIO 내부 URL과 공개 URL 분리
 
-### 5.1 현재 문제
+#### 5.1 현재 문제
 
 현재 백엔드는 `minio.url` 하나를 두 용도로 사용한다.
 
@@ -322,7 +337,7 @@ MINIO_URL=http://minio:9000
 -> 브라우저가 http://minio:9000 이미지 URL 접근 불가
 ```
 
-### 5.2 개선 방향
+#### 5.2 개선 방향
 
 환경 변수를 두 개로 분리한다.
 
@@ -359,7 +374,7 @@ MINIO_URL=http://minio:9000
 MINIO_PUBLIC_URL=https://image.example.com
 ```
 
-### 5.3 코드 수정 방향
+#### 5.3 코드 수정 방향
 
 `MinioProperties`에 공개 URL 필드를 추가한다.
 
@@ -396,7 +411,7 @@ Caution:
 - 해결하려면 public endpoint 기준으로 presigned URL을 발급하거나, 클라이언트가 접근 가능한 reverse proxy/도메인을 MinIO endpoint로 사용해야 한다.
 - Day1에서는 수정하지 않고 안건으로 기록한다.
 
-## 6. 문제 구분
+### 6. 문제 구분
 
 | 문제 | 분류 | 내용 |
 | --- | --- | --- |
@@ -405,11 +420,3 @@ Caution:
 | CORS origin 오류 | 환경 변수 문제 | FE origin과 BE 허용 origin 불일치 |
 | Docker DB 조회 API 초기 실패 | Docker 환경 변수/네트워크 문제 | BE 컨테이너 내부에서 `localhost`로 Oracle 접근 시도, `oracle-db` 사용 후 정상 |
 | MinIO URL 단일화 | 환경 변수 설계 문제 | 내부 접속 URL과 공개 URL 역할 충돌 |
-
-## 7. Day 1 남은 확인 항목
-
-- Docker Compose 환경의 MinIO presigned URL 실패를 Day2 이후 개선 항목으로 넘길지 확정
-- `MINIO_PUBLIC_URL` 분리 작업을 Day2 환경 변수 정리 또는 별도 MinIO 개선 작업으로 배치
-- `REACT_APP_API_BASE_URL`의 로컬 Docker 값과 배포 값을 분리해서 기록
-
-
