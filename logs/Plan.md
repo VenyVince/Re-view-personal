@@ -54,7 +54,6 @@ Re_View는 기능을 크게 늘리는 쇼핑몰 프로젝트가 아니라, 취�
 
 - `.env` 파일이 Docker 이미지에 포함되지 않도록 한다.
 - 필요한 환경 변수를 명확히 드러낸다.
-- MinIO 내부 접속 URL과 클라이언트 공개 URL을 분리한다.
 
 작업:
 
@@ -62,30 +61,16 @@ Re_View는 기능을 크게 늘리는 쇼핑몰 프로젝트가 아니라, 취�
 - `infra/.env.example`을 추가하거나 갱신한다.
 - Docker Compose는 계속 `env_file`로 런타임 환경 변수를 주입하도록 유지한다.
 - Docker 이미지에 `.env`가 포함되지 않는 구조인지 확인한다.
-- `MINIO_URL`은 백엔드 컨테이너의 내부 접속 endpoint로 사용한다.
-  - 로컬 Docker 예시: `http://minio:9000`
-- `MINIO_PUBLIC_URL`을 추가해 클라이언트가 접근 가능한 공개 endpoint로 사용한다.
-  - 로컬 Docker 예시: `http://localhost:9000`
-  - 배포 예시: `http://서버IP:9000` 또는 이미지 도메인
-- MinIO Client를 역할별로 분리한다.
-  - 내부 작업용 client: 업로드, 삭제, bucket 확인
-  - 공개 URL 발급용 client: presigned URL 발급
-- 발급된 presigned URL의 host를 문자열 치환하지 않는다.
-  - `minio:9000`을 `localhost:9000`으로 단순 변경하면 서명 불일치로 거절된다.
 
 결과물:
 
 - `.env`를 복사하지 않는 백엔드 Dockerfile
 - 민감 정보가 없는 `infra/.env.example`
-- `MINIO_URL`과 `MINIO_PUBLIC_URL`이 분리된 설정
-- public endpoint 기준으로 발급되는 presigned URL
 
 완료 기준:
 
 - Docker 이미지 빌드가 `infra/.env` 복사에 의존하지 않는다.
 - 런타임 환경 변수는 Docker Compose를 통해 외부에서 주입된다.
-- Docker Compose 환경에서 백엔드는 `minio:9000`으로 MinIO에 접속한다.
-- 브라우저는 `MINIO_PUBLIC_URL` 기준 presigned URL로 이미지에 접근할 수 있다.
 
 ---
 
@@ -339,13 +324,38 @@ README 후속 수정 대상:
 
 ### MinIO 리버스 프록시와 도메인 정리
 
-- `MINIO_URL` / `MINIO_PUBLIC_URL` 분리 발급이 안정화된 뒤 검토한다.
+- `MINIO_URL` / `MINIO_PUBLIC_URL` 분리를 별도 작업으로 검토한다.
+- `MINIO_URL`은 백엔드 컨테이너의 내부 접속 endpoint로 사용한다.
+  - 로컬 Docker 예시: `http://minio:9000`
+- `MINIO_PUBLIC_URL`은 클라이언트가 접근 가능한 공개 endpoint로 사용한다.
+  - 로컬 Docker 예시: `http://localhost:9000`
+  - 배포 예시: `http://서버IP:9000` 또는 이미지 도메인
+- MinIO Client 역할 분리를 검토한다.
+  - 내부 작업용 client: bucket 확인, 삭제, 검증, 리사이징, 바이러스 검사 등 서버 내부 작업
+  - 공개 URL 발급용 client: presigned URL 발급
+- 발급된 presigned URL의 host를 문자열 치환하지 않는다.
+  - `minio:9000`을 `localhost:9000`으로 단순 변경하면 서명 불일치로 거절된다.
+- public endpoint 기준 presigned URL 발급 구조를 검증한다.
+- Docker Compose 환경에서 공개 endpoint는 브라우저와 백엔드 컨테이너가 모두 접근 가능한 주소인지 확인한다.
 - 배포 환경에서 클라이언트가 접근할 이미지 공개 주소를 도메인 또는 리버스 프록시로 정리한다.
 - 예시:
   - `https://images.example.com`
   - `https://api.example.com/minio`
 - nginx 또는 인프라 프록시 설정으로 공개 주소를 MinIO에 연결한다.
-- 이 단계는 Day2의 분리 발급 이후 진행하며, Day2에서 함께 크게 묶어 처리하지 않는다.
+
+### MinIO 내부 보강 작업
+
+- presigned URL 발급 전에 bucket 존재 여부를 확인한다.
+- 필요하면 bucket 자동 생성 또는 명확한 시작 실패 정책을 정한다.
+- 업로드 파일 검증을 추가한다.
+  - 허용 확장자
+  - MIME type
+  - 최대 파일 크기
+  - 이미지 파일 여부
+- 이미지 리사이징 또는 썸네일 생성 필요성을 검토한다.
+- 바이러스 검사 또는 악성 파일 검사 도입 필요성을 검토한다.
+- 사용되지 않는 object key 정리 정책을 검토한다.
+- 이 작업은 현재 2주 안정화 범위에서는 제외하고, MinIO 구조 정리가 필요할 때 별도 브랜치에서 진행한다.
 
 ### 문서 확장
 
