@@ -1,65 +1,120 @@
-# Day 2 - Docker Environment Variable Cleanup Draft
+# Day 2 - Docker Environment Variable Cleanup
+
+확인 일시: 2026-05-05
 
 ## 목표
 
-Day 2의 목표는 Docker 환경 변수 구조를 정리하고, MinIO 내부 접속 URL과 클라이언트 공개 URL을 분리하는 것이다.
+Day 2의 우선 목표는 Docker 이미지에 `.env`가 포함되지 않도록 정리하고, Docker Compose 실행에 필요한 환경 변수 예시 파일을 준비하는 것이다.
 
-- `.env`가 Docker 이미지에 포함되지 않도록 정리한다.
-- Docker Compose 런타임 환경 변수 주입 구조를 유지한다.
-- MinIO 내부 접속 URL과 공개 URL을 분리한다.
-- presigned URL host 문자열 치환 방식은 사용하지 않는다.
+- 백엔드 Dockerfile에서 `.env` 복사 구문을 제거한다.
+- Docker Compose는 런타임 환경 변수 주입 구조를 유지한다.
+- `infra/.env.example`에 필요한 환경 변수 키를 민감 정보 없이 정리한다.
+- 로컬 실행용 값과 Docker Compose 실행용 값을 구분해서 기록한다.
 
-## 배경
+## 요약
 
-Day 1에서 확인한 결과:
+| 항목 | 결과 | 메모 |
+| --- | --- | --- |
+| 백엔드 Dockerfile `.env` 복사 제거 | 완료 | `COPY infra/.env .env` 제거 확인 |
+| `infra/.env.example` 추가 | 완료 | 실제 비밀번호 없이 placeholder 값 사용 |
+| 로컬/Docker 환경 변수 구분 | 반영 | Docker Compose 기준 값과 로컬 개발용 예시를 분리 |
+| Docker Compose 런타임 env 주입 | 유지 | `infra/docker-compose.yml`의 `env_file: .env` 구조 유지 |
 
-- 백엔드 로컬 실행은 가능했다.
-- 프론트엔드 로컬 실행도 가능했다.
-- Docker Compose 컨테이너 기동은 가능했다.
-- Docker Compose 환경에서 DB 조회 API는 정상 동작했다.
-- MinIO는 브라우저에서 `http://localhost:9000`으로 접근 가능했지만, presigned URL은 `http://minio:9000/...` 형태로 생성되어 브라우저 접근이 막혔다.
-- presigned URL의 host를 `localhost:9000`으로 바꿔도 서명 불일치로 거절되므로, 단순 문자열 치환으로는 해결할 수 없다.
+## 1. Dockerfile 정리
 
-## Day 2 작업 범위
+### 1.1 확인 대상
 
-### 1. Dockerfile 정리
+파일:
 
-- 백엔드 `Dockerfile`에서 `COPY infra/.env .env`가 있으면 제거한다.
-- Docker 이미지가 `.env` 파일 복사에 의존하지 않는지 확인한다.
+```text
+Dockerfile
+```
 
-### 2. `.env.example` 정리
+### 1.2 변경 내용
 
-- `infra/.env.example`을 추가하거나 갱신한다.
-- 민감 정보는 제외하고 필요한 키만 명시한다.
-- 로컬 Docker와 배포용 값의 차이를 주석으로 구분한다.
+기존 백엔드 Dockerfile에 있던 `.env` 복사 구문을 제거했다.
 
-### 3. MinIO 내부/공개 URL 분리
+```dockerfile
+COPY infra/.env .env
+```
 
-- `MINIO_URL`은 백엔드가 MinIO에 접속하는 내부 endpoint로 사용한다.
-  - 예시: `http://minio:9000`
-- `MINIO_PUBLIC_URL`은 브라우저가 접근할 공개 endpoint로 사용한다.
-  - 예시: `http://localhost:9000`
-- MinIO Client를 역할별로 나눈다.
-  - 내부 작업용 client: 업로드, 삭제, bucket 확인
-  - 공개 URL 발급용 client: presigned URL 발급
-- 발급된 presigned URL은 host 치환하지 않는다.
+현재 백엔드 Dockerfile은 빌드된 jar만 런타임 이미지에 복사한다.
 
-### 4. Compose 환경 재확인
+### 1.3 결과
 
-- Docker Compose에서 `be`, `fe`, `oracle-db`, `minio`가 함께 동작하는지 다시 확인한다.
-- 백엔드가 `oracle-db`와 `minio`를 내부 네트워크로 접근하는지 확인한다.
-- 브라우저가 `MINIO_PUBLIC_URL` 기준 이미지 URL에 접근하는지 확인한다.
+- Docker 이미지가 `infra/.env` 파일 복사에 의존하지 않는다.
+- 민감 정보가 이미지 레이어에 포함될 가능성을 줄였다.
+- 런타임 환경 변수는 Docker Compose의 `env_file`을 통해 외부에서 주입하는 구조를 유지한다.
 
-## 기대 결과
+## 2. 환경 변수 예시 파일 정리
 
-- Docker 이미지가 `.env` 복사에 의존하지 않는다.
-- Docker Compose 환경에서 백엔드가 `oracle-db`와 `minio`를 올바르게 참조한다.
-- 브라우저는 `MINIO_PUBLIC_URL` 기준 presigned URL로 이미지를 열 수 있다.
-- MinIO URL 관련 문제는 환경 변수 설계 문제로 정리되고, Day 2에서는 구조만 바로잡는다.
+### 2.1 확인 대상
 
-## 남은 확인 포인트
+파일:
 
-- 로컬 Maven/IntelliJ 실행과 Docker Compose 실행의 환경 변수 값을 분리해서 문서화해야 한다.
-- `REACT_APP_API_BASE_URL`은 로컬 Docker 검증용 값과 배포용 값을 따로 정리할 필요가 있다.
-- Day 2가 끝나면 `Todo.md`에서 Docker 관련 항목을 갱신한다.
+```text
+infra/.env.example
+```
 
+### 2.2 변경 내용
+
+Docker Compose 실행에 필요한 환경 변수 예시를 추가했다.
+
+주요 키:
+
+```env
+SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//{db_service_name}:1521/XEPDB1
+SPRING_DATASOURCE_USERNAME=oracle_username
+SPRING_DATASOURCE_PASSWORD=oracle_password
+
+MINIO_URL=http://{minio_service_name}:9000
+MINIO_PUBLIC_URL=http://localhost:9000
+
+MINIO_ROOT_USER=minio_admin
+MINIO_ROOT_PASSWORD=minio_password
+MINIO_BUCKET=minio_bucket
+
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+REACT_APP_API_BASE_URL=http://localhost:8080
+```
+
+실제 비밀번호나 운영 키는 넣지 않고 placeholder만 기록했다.
+
+### 2.3 로컬 실행용 예시
+
+로컬 Maven/IntelliJ 실행은 Docker Compose 서비스명을 사용할 수 없으므로, 로컬 실행용 값은 주석으로 분리했다.
+
+```env
+# SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//localhost:1521/XEPDB1
+# MINIO_URL=http://localhost:9000
+# MINIO_PUBLIC_URL=http://localhost:9000
+```
+
+### 2.4 주의사항
+
+- Docker Compose 실행 시 `{db_service_name}`은 실제 Compose DB 서비스명으로 바꿔야 한다.
+- Docker Compose 실행 시 `{minio_service_name}`은 실제 Compose MinIO 서비스명으로 바꿔야 한다.
+- 배포 전에는 `CORS_ALLOWED_ORIGINS`, `REACT_APP_API_BASE_URL`, `MINIO_PUBLIC_URL`을 공개 주소 기준으로 바꿔야 한다.
+- `infra/.env.example`은 예시 파일이며, 실제 실행 값은 `infra/.env`에 둔다.
+
+## 3. 이번 커밋에서 제외할 내용
+
+MinIO 내부 URL과 공개 URL을 코드에서 분리하는 작업은 이번 커밋 범위에서 제외한다.
+
+이유:
+
+- 현재 프로젝트의 실제 이미지 흐름은 백엔드 내부 MinIO 작업보다 presigned URL 발급 중심이다.
+- 내부용 MinIO client와 공개 URL 발급용 client 분리는 별도 브랜치에서 검토하는 편이 변경 범위가 명확하다.
+- Docker Compose 환경에서 `MINIO_PUBLIC_URL`은 브라우저뿐 아니라 백엔드 컨테이너도 접근 가능한 주소여야 하므로 추가 검증이 필요하다.
+
+추후 검토할 내용:
+
+- MinIO bucket 존재 확인 같은 작은 내부 검증 작업 추가 여부
+- `MINIO_URL` / `MINIO_PUBLIC_URL` 분리 코드 유지 여부
+- Docker Compose 환경에서 presigned URL host 검증
+
+## 4. 남은 확인 항목
+
+- Docker Compose에서 실제 `.env` 값을 기준으로 백엔드, 프론트엔드, Oracle XE, MinIO 기동 확인
+- `infra/.env.example`의 placeholder를 실제 로컬 Docker 값으로 복사해 사용할 때 오류가 없는지 확인
+- MinIO URL 분리 관련 코드는 별도 브랜치에서 재검토
