@@ -8,7 +8,7 @@
 - [x] Docker Compose 실행 확인
 - [x] `Dockerfile`에서 `.env` 복사 제거
 - [x] `.env.example` 추가
-- [ ] `SecurityConfig` 인증/인가 정책 정리
+- [x] `SecurityConfig` 인증/인가 정책 정리
 - [ ] 401/403 응답 상태 코드 정리
 - [ ] 테스트 프로파일 수정
 - [ ] `mvn test` 실행 가능 상태 만들기
