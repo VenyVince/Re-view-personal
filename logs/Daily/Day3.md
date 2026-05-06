@@ -11,14 +11,14 @@ Day 3의 목표는 코드를 바로 막는 것이 아니라, 실제 API 사용 �
 
 ## 작업 체크리스트
 
-- [ ] 전체 컨트롤러의 endpoint 목록을 수집한다.
-- [ ] `View/src/api`와 주요 페이지에서 호출하는 API 목록을 확인한다.
-- [ ] 공개 API를 분류한다.
-- [ ] 로그인 필요 API를 분류한다.
-- [ ] 관리자 API를 분류한다.
-- [ ] `SecurityConfig`의 현재 matcher와 실제 API 분류를 비교한다.
-- [ ] `View/src/api/axiosClient.js`의 `Authorization: Bearer` 전송 코드가 세션 인증 정책과 충돌하는지 기록한다.
-- [ ] Day 4에서 적용할 matcher 초안을 작성한다.
+- [x] 전체 컨트롤러의 endpoint 목록을 수집한다.
+- [x] `View/src/api`와 주요 페이지에서 호출하는 API 목록을 확인한다.
+- [x] 공개 API를 분류한다.
+- [x] 로그인 필요 API를 분류한다.
+- [x] 관리자 API를 분류한다.
+- [x] `SecurityConfig`의 현재 matcher와 실제 API 분류를 비교한다.
+- [x] `View/src/api/axiosClient.js`의 `Authorization: Bearer` 전송 코드가 세션 인증 정책과 충돌하는지 기록한다.
+- [x] Day 4에서 적용할 matcher 초안을 작성한다.
 
 ## 분류 기준
 
@@ -69,6 +69,27 @@ Day 3의 목표는 코드를 바로 막는 것이 아니라, 실제 API 사용 �
 - API 인증/인가 분류 메모
 - `SecurityConfig` matcher 정책 초안
 - 프론트 인증 요청 방식 정리 메모
+
+정리 파일:
+
+- `logs/API/endpointList.md`
+
+## 작업 결과 요약
+
+- 백엔드 컨트롤러 기준으로 실제 endpoint 목록을 수집했다.
+- 프론트 `View/src/api`, 주요 `pages`에서 호출하는 API를 확인했다.
+- API를 공개 API, 로그인 필요 API, 관리자 API로 분류했다.
+- 현재 `SecurityConfig`에서 `/api/admin/**` 외 대부분 API가 `anyRequest().permitAll()`에 의해 공개될 수 있음을 확인했다.
+- 세션 인증을 유지하는 기준에서 `axiosClient.js`의 `Authorization: Bearer` 전송 코드는 제거 또는 legacy 코드 정리가 필요하다고 기록했다.
+- Day 4에서 적용할 수 있도록 method/path 기준 matcher 초안을 작성했다.
+
+## Day 4 진행 메모
+
+- `SecurityConfig`에 matcher 초안을 실제 적용한다.
+- 인증 실패는 `401`, 권한 부족은 `403`으로 응답 코드를 정리한다.
+- `GET /api/qna/{qna_id}` 공개 여부는 비밀글 정책에 따라 확정한다.
+- 주소, 주문, 결제수단, 리뷰, QnA는 로그인 여부뿐 아니라 리소스 소유자 검증도 함께 확인한다.
+- 프론트 `Authorization: Bearer` 전송 코드를 세션 인증 정책에 맞게 정리한다.
 
 ## 완료 기준
 
