@@ -18,14 +18,14 @@
 
 ## 작업 체크리스트
 
-- [ ] `SecurityConfig`의 `authenticationEntryPoint`를 401 기준으로 수정한다.
-- [ ] `SecurityConfig`의 `accessDeniedHandler`를 403 기준으로 수정한다.
-- [ ] 기존 로그아웃 응답이 깨지지 않는지 확인한다.
-- [ ] `ErrorResponse` DTO 추가 여부와 필드를 결정한다.
-- [ ] 전역 예외 응답을 문자열에서 공통 JSON 포맷으로 바꾼다.
-- [ ] DB 예외 처리에서 `printStackTrace()`/`System.err` 사용을 로거 기반으로 바꿀지 검토한다.
-- [ ] 회원가입, 로그인, 비밀번호 변경 DTO부터 `jakarta.validation` 적용 범위를 정한다.
-- [ ] DTO 검증 실패 응답을 공통 포맷에 맞출지 결정한다.
+- [x] `SecurityConfig`의 `authenticationEntryPoint`를 401 기준으로 수정한다.
+- [x] `SecurityConfig`의 `accessDeniedHandler`를 403 기준으로 수정한다.
+- [x] 기존 로그아웃 응답이 깨지지 않는지 확인한다.
+- [x] `ErrorResponse` DTO 추가 여부와 필드를 결정한다.
+- [x] 전역 예외 응답을 문자열에서 공통 JSON 포맷으로 바꾼다.
+- [x] DB 예외 처리에서 `printStackTrace()`/`System.err` 사용을 로거 기반으로 바꿀지 검토한다.
+- [x] 회원가입, 로그인, 비밀번호 변경 DTO부터 `jakarta.validation` 적용 범위를 정한다.
+- [x] DTO 검증 실패 응답을 공통 포맷에 맞출지 결정한다.
 - [ ] `anyRequest().denyAll()` 전환은 Day 5 범위에 포함할지, 테스트 작성 이후로 유지할지 다시 확인한다.
 
 ## 권장 응답 기준
@@ -40,11 +40,11 @@
 
 ## 검증 시나리오
 
-- [ ] 미로그인 상태로 보호 API 호출 시 401이 반환된다.
-- [ ] 일반 사용자로 관리자 API 호출 시 403이 반환된다.
-- [ ] 잘못된 요청 값은 400으로 반환된다.
-- [ ] 없는 리소스는 404로 반환된다.
-- [ ] 프론트에서 상태 코드와 JSON 본문을 기준으로 오류 원인을 구분할 수 있다.
+- [x] 미로그인 상태로 보호 API 호출 시 401이 반환된다.
+- [x] 일반 사용자로 관리자 API 호출 시 403이 반환된다.
+- [x] 잘못된 요청 값은 400으로 반환된다.
+- [x] 없는 리소스는 404로 반환된다.
+- [x] 프론트에서 상태 코드와 JSON 본문을 기준으로 오류 원인을 구분할 수 있다.
 
 ## 결과물
 
@@ -58,6 +58,8 @@
 - Day 4에서 확인한 공개 탐색 API 흐름은 깨지지 않게 유지한다.
 - 응답 포맷 개편은 작게 진행하고, 프론트가 바로 구분해야 하는 401/403을 우선 처리한다.
 - `anyRequest().denyAll()` 전환은 테스트 코드가 준비된 뒤 적용하는 방향을 기본값으로 둔다.
+- `SecurityConfig`에서 `ObjectMapper`를 직접 생성했었는데, 이렇게 하면 `LocalDateTime` 직렬화 설정이 빠져 런타임 오류가 날 수 있어서 Spring Bean으로 주입받도록 재변경했다.
+- DTO 검증 실패가 기본 Spring 오류 응답으로 내려갈 수 있어서 `MethodArgumentNotValidException`도 `ErrorResponseDTO` 포맷으로 재변경했다.
 
 ## 완료 기준
 

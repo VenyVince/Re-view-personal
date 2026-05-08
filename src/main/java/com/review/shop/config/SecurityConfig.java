@@ -1,10 +1,13 @@
 package com.review.shop.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.review.shop.dto.ErrorResponseDTO;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -14,12 +17,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler; // ★ 필수 import
+import java.time.LocalDateTime;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @AllArgsConstructor
 public class SecurityConfig {
+    private final ObjectMapper objectMapper;
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
@@ -109,14 +114,32 @@ public class SecurityConfig {
 
                 .exceptionHandling(exception -> exception
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            response.setStatus(400);
+                            response.setStatus(HttpStatus.FORBIDDEN.value());
                             response.setContentType("application/json;charset=UTF-8");
-                            response.getWriter().write("접근 권한이 부족합니다.");
+                            ErrorResponseDTO errorResponseDTO = new ErrorResponseDTO(
+                                    HttpStatus.FORBIDDEN.value(),
+                                    "Access Denied",
+                                    "접근 권한이 부족합니다.",
+                                    request.getRequestURI(),
+                                    LocalDateTime.now()
+                            );
+                            response.getWriter().write(
+                                    objectMapper.writeValueAsString(errorResponseDTO)
+                            );
                         })
                         .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(400);
+                            response.setStatus(HttpStatus.UNAUTHORIZED.value());
                             response.setContentType("application/json;charset=UTF-8");
-                            response.getWriter().write("로그인이 필요합니다.");
+                            ErrorResponseDTO errorResponseDTO = new ErrorResponseDTO(
+                                    HttpStatus.UNAUTHORIZED.value(),
+                                    "Unauthorized",
+                                    "로그인이 필요합니다.",
+                                    request.getRequestURI(),
+                                    LocalDateTime.now()
+                            );
+                            response.getWriter().write(
+                                    objectMapper.writeValueAsString(errorResponseDTO)
+                            );
                         })
                 )
 

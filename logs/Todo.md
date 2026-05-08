@@ -9,16 +9,18 @@
 - [x] `Dockerfile`에서 `.env` 복사 제거
 - [x] `.env.example` 추가
 - [x] `SecurityConfig` 인증/인가 정책 정리
-- [ ] 401/403 응답 상태 코드 정리
-- [ ] 테스트 프로파일 수정
-- [ ] `mvn test` 실행 가능 상태 만들기
+- [x] 401/403 응답 상태 코드 정리
+- [x] 테스트 프로파일 수정
+- [x] `mvn test` 실행 가능 상태 만들기
 - [ ] 깨진 한글 문구 정리
 - [ ] README 취업용으로 재작성
 
 ## Should
 
-- [ ] `ErrorResponse` DTO 추가
-- [ ] 전역 예외 응답 표준화
+- [x] `ErrorResponse` DTO 추가
+- [x] 전역 예외 응답 표준화
+- [x] 회원가입/로그인/비밀번호 변경 DTO validation 적용
+- [x] DTO 검증 실패 응답 공통 포맷 적용
 - [ ] Swagger 설명 정리
 - [ ] MinIO 설정 키 통일
 - [ ] `@EnableScheduling` 추가 여부 결정
