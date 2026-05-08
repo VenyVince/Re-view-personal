@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -53,8 +54,56 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/auth/register",
+                                "/api/auth/login",
+                                "/api/auth/check-id",
+                                "/api/auth/find-id",
+                                "/api/auth/send-temp-password"
+                        ).permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/products",
+                                "/api/products/*",
+                                "/api/reviews",
+                                "/api/reviews/*",
+                                "/api/reviews/*/reviews",
+                                "/api/products/*/reviews/search",
+                                "/api/search",
+                                "/api/images/banners",
+                                "/api/recommendations/admin-pick",
+                                "/api/qna/list/*"
+                                ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/mypage/**").hasRole("USER")
+                        .requestMatchers(
+                                "/api/auth/me",
+                                "/api/auth/my-baumann-type",
+                                "/api/auth/reset-password",
+                                "/api/users/me/**",
+                                "/api/addresses/**",
+                                "/api/cart/**",
+                                "/api/wishlist/**",
+                                "/api/orders/**",
+                                "/api/users/me/payments/**",
+                                "/api/users/me/points/**",
+                                "/api/reviews/exists/**",
+                                "/api/reviews/*/comments",
+                                "/api/reviews/comments/**",
+                                "/api/reviews/*/reaction",
+                                "/api/reviews/*/report",
+                                "/api/users/reviews/search",
+                                "/api/qna/my",
+                                "/api/images/products/convert-data",
+                                "/api/images/products/convert-datas",
+                                "/api/recommendations/all"
+                                ).authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/reviews/*").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/reviews/*").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/reviews/*/*").authenticated()
+
+                        .requestMatchers(HttpMethod.POST, "/api/qna").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/qna").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/qna/*").authenticated()
+
                         .anyRequest().permitAll()
                 )
 

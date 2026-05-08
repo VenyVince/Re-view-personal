@@ -1,6 +1,6 @@
 package com.review.shop.controller.user;
 
-//회원가입, 로그인, 로그아웃 등의 핵심 인증 기능을 담당하는 컨트롤러
+//회원가입, 로그인 등의 핵심 인증 기능을 담당하는 컨트롤러(로그아웃은 Security Config에 존재: logoutUrl)
 
 import com.review.shop.dto.user.LoginRequestDTO;
 import com.review.shop.dto.user.PasswordUpdateDTO;
