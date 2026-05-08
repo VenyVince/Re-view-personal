@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,7 +60,7 @@ public class UserUtilController {
                     content = @Content(schema = @Schema(implementation = String.class)))
     })
     @PostMapping("/api/auth/send-temp-password")
-    public ResponseEntity<String> sendTemporaryPassword(@RequestBody TemPasswordDTO temPasswordDTO) {
+    public ResponseEntity<String> sendTemporaryPassword(@Valid @RequestBody TemPasswordDTO temPasswordDTO) {
         String id = temPasswordDTO.getId();
         String email = temPasswordDTO.getEmail();
 

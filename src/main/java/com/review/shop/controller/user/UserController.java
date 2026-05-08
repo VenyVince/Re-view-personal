@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -52,7 +53,7 @@ public class UserController  {
                     content = @Content(schema = @Schema(implementation = String.class)))
     })
     @PostMapping("/api/auth/register")
-    public ResponseEntity<String> registerUser(@RequestBody UserInfoDTO userDTO) {
+    public ResponseEntity<String> registerUser(@Valid @RequestBody UserInfoDTO userDTO) {
 
         String type = userDTO.getBaumann_id();
 
@@ -77,7 +78,7 @@ public class UserController  {
     })
     @PostMapping("/api/auth/login")
     public ResponseEntity<Map<String, Object>> login(
-            @RequestBody LoginRequestDTO loginDto,
+            @Valid @RequestBody LoginRequestDTO loginDto,
             @Parameter(hidden = true)
             HttpServletRequest request
     ) {
@@ -126,7 +127,7 @@ public class UserController  {
     })
     @PostMapping("/api/auth/reset-password")
     public ResponseEntity<String> resetPassword(
-            @RequestBody PasswordUpdateDTO passwordUpdateDto,
+            @Valid @RequestBody PasswordUpdateDTO passwordUpdateDto,
             @Parameter(hidden = true)
             @AuthenticationPrincipal UserDetails userDetails
     ) {
