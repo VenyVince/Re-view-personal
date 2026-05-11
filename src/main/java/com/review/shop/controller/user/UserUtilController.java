@@ -2,6 +2,7 @@ package com.review.shop.controller.user;
 
 //아이디 중복 확인, 아이디 찾기, 임시 비밀번호 발송 등의 부가 기능을 담당하는 컨트롤러
 
+import com.review.shop.dto.ErrorResponseDTO;
 import com.review.shop.dto.user.TemPasswordDTO;
 import com.review.shop.exception.WrongRequestException;
 import com.review.shop.service.user.UserService;
@@ -34,8 +35,10 @@ public class UserUtilController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "사용 가능한 아이디 (메시지 문자열 반환)"),
-            @ApiResponse(responseCode = "400", description = "백엔드 오류",
-                    content = @Content(schema = @Schema(implementation = String.class)))
+            @ApiResponse(responseCode = "400", description = "이미 사용 중인 아이디 또는 잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "서버 오류",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     @PostMapping("/api/auth/check-id")
     public ResponseEntity<String> checkDuplicateId(@RequestBody Map<String, String> payload) {
@@ -52,12 +55,12 @@ public class UserUtilController {
     @Operation (summary = "임시 비밀번호 발송")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "임시 비밀번호 발송 성공 (메시지 문자열 반환)"),
-            @ApiResponse(responseCode = "400", description = "백엔드 오류",
-                    content = @Content(schema = @Schema(implementation = String.class))),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 또는 검증 실패",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse (responseCode = "404", description = "사용자 정보 불일치",
-                    content = @Content(schema = @Schema(implementation = String.class))),
-            @ApiResponse(responseCode = "500", description = "DB오류",
-                    content = @Content(schema = @Schema(implementation = String.class)))
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "서버 또는 DB 오류",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     @PostMapping("/api/auth/send-temp-password")
     public ResponseEntity<String> sendTemporaryPassword(@Valid @RequestBody TemPasswordDTO temPasswordDTO) {
@@ -72,10 +75,12 @@ public class UserUtilController {
     @Operation (summary = "아이디 찾기")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "아이디 찾기 성공 (메시지 문자열 반환)"),
-            @ApiResponse(responseCode = "400", description = "백엔드 오류",
-                    content = @Content(schema = @Schema(implementation = String.class))),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "404", description = "아이디를 찾을 수 없음.",
-                    content = @Content(schema = @Schema(implementation = String.class)))
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "서버 오류",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     @PostMapping("/api/auth/find-id")
     public ResponseEntity<String> findId(@RequestBody Map<String, String> payload) {

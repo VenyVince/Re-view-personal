@@ -1,6 +1,7 @@
 package com.review.shop.config;
 
 import com.review.shop.dto.ErrorResponseDTO;
+import com.review.shop.exception.BannedUserException;
 import com.review.shop.exception.DatabaseException;
 import com.review.shop.exception.FileProcessingException;
 import com.review.shop.exception.ResourceNotFoundException;
@@ -114,6 +115,19 @@ public class ExceptionHandlers {
         ErrorResponseDTO errorResponseDTO = new ErrorResponseDTO(
                 HttpStatus.UNAUTHORIZED.value(),
                 "Unauthorized",
+                e.getMessage(),
+                r.getRequestURI(),
+                LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponseDTO);
+    }
+
+    // 밴 처리된 사용자 로그인 시도
+    @ExceptionHandler(BannedUserException.class)
+    public ResponseEntity<ErrorResponseDTO> handleBannedUserException(BannedUserException e, HttpServletRequest r) {
+        ErrorResponseDTO errorResponseDTO = new ErrorResponseDTO(
+                HttpStatus.UNAUTHORIZED.value(),
+                "Banned User",
                 e.getMessage(),
                 r.getRequestURI(),
                 LocalDateTime.now()

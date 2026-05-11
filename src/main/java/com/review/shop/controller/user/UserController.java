@@ -5,6 +5,8 @@ package com.review.shop.controller.user;
 import com.review.shop.dto.user.LoginRequestDTO;
 import com.review.shop.dto.user.PasswordUpdateDTO;
 import com.review.shop.dto.user.UserInfoDTO;
+import com.review.shop.dto.ErrorResponseDTO;
+import com.review.shop.exception.BannedUserException;
 import com.review.shop.exception.ResourceNotFoundException;
 import com.review.shop.service.user.UserService;
 import com.review.shop.util.Security_Util;
@@ -49,8 +51,10 @@ public class UserController  {
     @Operation(summary = "회원 가입")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "회원가입 성공 (메시지 문자열 반환)"),
-            @ApiResponse(responseCode = "400", description = "백엔드 오류",
-                    content = @Content(schema = @Schema(implementation = String.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 또는 검증 실패",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "서버 오류",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     @PostMapping("/api/auth/register")
     public ResponseEntity<String> registerUser(@Valid @RequestBody UserInfoDTO userDTO) {
@@ -70,11 +74,15 @@ public class UserController  {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "로그인 성공 (JSON 객체 반환)",
                     content = @Content(schema = @Schema(type = "object", example = "{\"message\": \"로그인 성공\", \"user_id\": \"testuser123\"}"))),
-            @ApiResponse(responseCode = "400", description = "백엔드 오류",
-                    content = @Content(schema = @Schema(implementation = String.class))),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 또는 검증 실패",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
 
             @ApiResponse (responseCode = "401", description = "밴 당한 사용자 로그인 시도",
-                    content = @Content(schema = @Schema(type = "object", example = "{\"message\": \"밴 당한 사용자입니다. 관리자에게 문의하세요.\"}")))
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "아이디 또는 비밀번호 불일치",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "서버 오류",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     @PostMapping("/api/auth/login")
     public ResponseEntity<Map<String, Object>> login(
@@ -89,9 +97,7 @@ public class UserController  {
         // true면 밴리스트에 존재
         boolean isBanned = userService.isUserBanned(user_id);
         if (isBanned) {
-            return ResponseEntity
-                    .status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "밴 당한 사용자입니다. 관리자에게 문의하세요."));
+            throw new BannedUserException("밴 당한 사용자입니다. 관리자에게 문의해주세요.");
         }
 
         if (!passwordEncoder.matches(loginDto.getPassword(), encodedPassword)) {
@@ -122,8 +128,12 @@ public class UserController  {
     @Operation(summary = "비밀번호 재설정 (인증 필요)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "비밀번호 재설정 성공 (메시지 문자열 반환)"),
-            @ApiResponse(responseCode = "400", description = "백엔드 오류",
-                    content = @Content(schema = @Schema(implementation = String.class)))
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 또는 검증 실패",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "인증 필요",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "서버 오류",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     @PostMapping("/api/auth/reset-password")
     public ResponseEntity<String> resetPassword(
@@ -141,8 +151,10 @@ public class UserController  {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "내 정보 조회 성공 (JSON 객체 반환)",
                     content = @Content(schema = @Schema(type = "object", example = "{\"id\": \"testuser123\", \"role\": \"ROLE_USER\"}"))),
-            @ApiResponse(responseCode = "400", description = "백엔드 오류",
-                    content = @Content(schema = @Schema(implementation = String.class)))
+            @ApiResponse(responseCode = "401", description = "인증 필요",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "서버 오류",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     @GetMapping("/api/auth/me")
     public ResponseEntity<?> getMyInfo(
@@ -170,10 +182,12 @@ public class UserController  {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "내 바우만 타입 조회 성공 (문자열 반환)",
                     content = @Content(schema = @Schema(type = "string", example = "Type A"))),
-            @ApiResponse(responseCode = "400", description = "백엔드 오류",
-                    content = @Content(schema = @Schema(implementation = String.class))),
+            @ApiResponse(responseCode = "401", description = "인증 필요",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "404", description = "유저를 찾을 수 없음",
-                    content = @Content(schema = @Schema(implementation = String.class)))
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "서버 오류",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     @GetMapping("/api/auth/my-baumann-type")
     public String getCurrentUserBaumannType(

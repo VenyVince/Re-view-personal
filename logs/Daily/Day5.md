@@ -26,7 +26,7 @@
 - [x] DB 예외 처리에서 `printStackTrace()`/`System.err` 사용을 로거 기반으로 바꿀지 검토한다.
 - [x] 회원가입, 로그인, 비밀번호 변경 DTO부터 `jakarta.validation` 적용 범위를 정한다.
 - [x] DTO 검증 실패 응답을 공통 포맷에 맞출지 결정한다.
-- [ ] `anyRequest().denyAll()` 전환은 Day 5 범위에 포함할지, 테스트 작성 이후로 유지할지 다시 확인한다.
+- [x] `anyRequest().denyAll()` 전환은 Day 5 범위에 포함할지, 테스트 작성 이후로 유지할지 다시 확인한다.
 
 ## 권장 응답 기준
 
