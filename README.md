@@ -22,6 +22,7 @@ Re_View는 사용자 리뷰와 Baumann 피부 타입 데이터를 기반으로 �
 - [주요 API](#주요-api)
 - [핵심 구현 내용](#핵심-구현-내용)
 - [팀 구성 및 역할](#팀-구성-및-역할)
+- [2주 안정화 작업 요약](#2주-안정화-작업-요약)
 - [취업용 README 보강 항목](#취업용-readme-보강-항목)
 
 ## 주요 기능
@@ -221,9 +222,11 @@ Spring Security 기반 세션 인증을 사용합니다. 로그인 성공 시 �
 
 ## 검증 결과
 
-- 백엔드 테스트: `mvnw.cmd test` 통과 상태에서 Day 5 작업이 종료되었습니다.
+- 백엔드 테스트: 2026-05-12 14:18 KST 기준 `mvnw.cmd test` 통과.
+- 프론트 빌드: 2026-05-12 14:18 KST 기준 `npm --prefix View run build` 성공.
 - 예외 응답: `ExceptionHandlers`와 Spring Security 인증/인가 실패 응답은 `ErrorResponseDTO` 기반으로 정리되었습니다.
 - Swagger: 인증 관련 API의 오류 응답 설명을 `ErrorResponseDTO` 기준으로 정리했습니다.
+- 남은 경고: Mockito 동적 Java agent 로딩 경고, SpringDoc 운영 환경 비활성화 권장 경고, React Hook dependency와 미사용 변수/import 중심의 ESLint 경고가 남아 있습니다.
 - 남은 검증: `anyRequest().denyAll()` 전환 전 공개 API, 인증 필요 API, 관리자 API 접근 테스트가 필요합니다.
 
 ## 주요 API
@@ -260,6 +263,8 @@ Spring Security 기반 세션 인증을 사용합니다. 로그인 성공 시 �
 
 | Method | URL | Description |
 | --- | --- | --- |
+| POST | `/api/images/reviews` | 리뷰 이미지 업로드 URL 발급 |
+| POST | `/api/images/products` | 상품 이미지 업로드 URL 발급 |
 | POST | `/api/images/products/convert-data` | 상품 이미지 업로드 URL 발급 |
 | POST | `/api/images/products/convert-datas` | 복수 상품 이미지 업로드 URL 발급 |
 | GET | `/api/images/banners` | 배너 이미지 조회 |
@@ -277,7 +282,7 @@ Spring Security 기반 세션 인증을 사용합니다. 로그인 성공 시 �
 
 ### Baumann 피부 타입 기반 추천
 
-Baumann 피부 타입의 4가지 요소를 기준으로 사용자와 상품, 리뷰의 적합도를 계산합니다. 상품 추천과 리뷰 추천은 각각 별도의 SQL 기반 점수 계산 기준을 가지며, 계산된 점수를 기준으로 상위 결과를 제공합니다.
+Baumann 피부 타입의 4가지 요소를 기준으로 사용자와 상품, 리뷰의 적합도를 계산합니다. 상품 추천은 상품 피부 타입 적합도와 리뷰 수 기반 점수를 합산한 `total_score`를 사용하고, 리뷰 추천은 리뷰 작성자의 피부 타입 일치도와 리뷰 반응 데이터를 반영한 `total_score`를 기준으로 정렬합니다.
 
 ### MinIO Presigned URL 기반 이미지 업로드
 
@@ -309,6 +314,21 @@ Baumann 피부 타입의 4가지 요소를 기준으로 사용자와 상품, 리
 | 오승환 | 프론트엔드 | 마이페이지 전체 UI |
 | 김시연 | 프론트엔드 | 관리자 페이지, 설문조사 UI |
 | 박진성 | 프론트엔드 | 검색, 상품, 리뷰 페이지 UI |
+
+## 2주 안정화 작업 요약
+
+| Day | 핵심 내용 |
+| --- | --- |
+| Day 1 | 로컬 백엔드/프론트 실행, Docker Compose 기동, DB/MinIO/CORS 환경 이슈 분리 |
+| Day 2 | Dockerfile의 `.env` 복사 제거, `infra/.env.example` 추가, 런타임 환경 변수 주입 구조 정리 |
+| Day 3 | 전체 API를 공개, 인증 필요, 관리자 API로 분류하고 `SecurityConfig` matcher 초안 작성 |
+| Day 4 | `SecurityConfig`에 인증/인가 정책 적용, 세션 인증과 충돌하던 Bearer token 전송 제거 |
+| Day 5 | 인증 실패 401, 권한 부족 403 분리 및 `ErrorResponseDTO` 기반 예외 응답 표준화 |
+| Day 6 | Swagger 오류 응답 설명, 테스트 프로파일, README 초안, 깨진 한글 주석 정리 |
+| Day 7 | `mvn test` 재확인 및 보안/예외/주문/리뷰 테스트 후보 정리 |
+| Day 8 | 베스트 리뷰 스케줄러 활성화, 리뷰 작성/삭제/베스트/관리자 선정 보상 흐름 확인 |
+| Day 9 | 프론트 빌드 경고 확인, 남은 Hook dependency와 미사용 변수 cleanup 기준 정리 |
+| Day 10 | 최종 `mvn test`, 프론트 빌드 검증, README와 최종 작업 요약 반영 |
 
 ## 취업용 README 보강 항목
 
