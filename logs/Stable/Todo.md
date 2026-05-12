@@ -24,9 +24,6 @@
 - [x] Swagger 설명 정리
 - [x] MinIO 설정 키 통일
 - [x] `@EnableScheduling` 추가 여부 결정
-- [x] DB 초기화 방법 문서화
-- [x] 서비스 아키텍처 다이어그램 추가
-- [x] ERD 추가
 
 ## Optional
 
