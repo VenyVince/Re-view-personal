@@ -21,6 +21,10 @@ Re_View는 사용자 리뷰와 Baumann 피부 타입 데이터를 기반으로 �
 - [검증 결과](#검증-결과)
 - [주요 API](#주요-api)
 - [핵심 구현 내용](#핵심-구현-내용)
+- [ERD](#erd)
+- [DB 초기화 메모](#db-초기화-메모)
+- [본인 기여도](#본인-기여도)
+- [트러블슈팅](#트러블슈팅)
 - [팀 구성 및 역할](#팀-구성-및-역할)
 - [2주 안정화 작업 요약](#2주-안정화-작업-요약)
 - [취업용 README 보강 항목](#취업용-readme-보강-항목)
@@ -120,7 +124,7 @@ src/main/java/com/review/shop
 
 ## 실행 방법
 
-Oracle 스키마와 MinIO bucket은 별도로 생성되어 있어야 합니다. DB 초기화 SQL과 샘플 데이터는 정리 예정입니다.
+Oracle 스키마와 MinIO bucket은 별도로 생성되어 있어야 합니다. DB 초기화 참고 사항은 [DB 초기화 메모](#db-초기화-메모)를 확인합니다.
 
 ### 1. 환경 변수 설정
 
@@ -304,6 +308,67 @@ Baumann 피부 타입의 4가지 요소를 기준으로 사용자와 상품, 리
 
 관리자 API를 `/api/admin/**` 경로로 분리하여 상품, 주문, 사용자, 리뷰, 신고, QnA를 관리할 수 있도록 구현했습니다.
 
+## ERD
+
+핵심 관계는 회원, 상품, 주문, 리뷰, 포인트, 이미지 흐름을 중심으로 구성됩니다. 상세 ERD 메모는 [logs/ERD.md](logs/Other/ERD.md)에 정리했습니다.
+
+```mermaid
+erDiagram
+    BAUMANN ||--o{ USER_TABLE : classifies
+    BAUMANN ||--o{ PRODUCT : targets
+    USER_TABLE ||--o{ ORDERS : places
+    USER_TABLE ||--o{ REVIEW : writes
+    USER_TABLE ||--o{ POINT_HISTORY : has
+    USER_TABLE ||--o{ ADDRESS : has
+    USER_TABLE ||--o{ PAYMENT_METHODS : has
+    PRODUCT ||--o{ PRODUCT_IMAGE : has
+    PRODUCT ||--o{ ORDER_ITEM : ordered
+    PRODUCT ||--o{ REVIEW : reviewed
+    ORDERS ||--o{ ORDER_ITEM : contains
+    ORDER_ITEM ||--o{ REVIEW : source
+    REVIEW ||--o{ REVIEW_IMAGES : has
+    REVIEW ||--o{ REVIEW_COMMENT : has
+    REVIEW ||--o{ REVIEW_LIKE : has
+    REVIEW ||--o{ REVIEW_REPORT : has
+    REVIEW ||--o{ POINT_HISTORY : reward
+```
+
+## DB 초기화 메모
+
+현재 저장소에는 바로 실행 가능한 최신 DDL/seed SQL을 포함하지 않습니다. 외부 문서 저장소의 Oracle DDL은 `"USER"`, `"ORDER"` 같은 레거시 테이블명을 포함하므로 현재 mapper 기준인 `USER_TABLE`, `ORDERS`와 대조해 보정해야 합니다.
+
+초기화 권장 순서:
+
+1. Oracle XE 사용자와 권한 준비
+2. `BAUMANN`, `USER_TABLE`, `PRODUCT` 등 기준 테이블 생성
+3. 상품 이미지, 주소, 결제수단, 주문, 리뷰, 포인트, QnA 순서로 의존 테이블 생성
+4. `BAUMANN` 기준 데이터와 상품 샘플 데이터 적재
+5. `GET /api/products`, `GET /api/reviews`, `POST /api/auth/login`으로 DB 연결 검증
+
+상세 메모는 [logs/DB_INIT.md](logs/Other/DB_INIT.md)에 정리했습니다.
+
+## 본인 기여도
+
+| 영역 | 기여 내용 |
+| --- | --- |
+| 백엔드/인프라 안정화 | 로컬/Docker 실행 환경을 점검하고 DB, MinIO, CORS, 환경 변수 문제를 코드 문제와 분리해 정리했습니다. |
+| 보안 정책 정리 | 세션 인증 방식을 유지하면서 공개 API, 인증 필요 API, 관리자 API를 분류하고 `SecurityConfig` matcher에 반영했습니다. |
+| 예외 응답 표준화 | 인증 실패 401, 권한 부족 403을 분리하고 `ErrorResponseDTO` 기반 공통 JSON 응답으로 정리했습니다. |
+| 이미지 처리 | MinIO presigned URL 기반 업로드/조회 흐름을 유지하면서 object key와 조회용 URL의 책임을 분리했습니다. |
+| 추천/리뷰 보상 검증 | Baumann 기반 추천 점수와 리뷰 작성/삭제/베스트/관리자 선정 보상 흐름을 코드 기준으로 확인했습니다. |
+| 문서화 | 실행 방법, 보안 정책, 예외 응답, ERD, DB 초기화, 트러블슈팅, 2주 안정화 결과를 README와 logs 문서로 정리했습니다. |
+
+## 트러블슈팅
+
+| 문제 | 원인 | 해결 |
+| --- | --- | --- |
+| Docker 백엔드에서 Oracle 접속 실패 | 컨테이너 내부 `localhost`가 Oracle 컨테이너가 아니라 백엔드 컨테이너 자신을 가리킴 | Docker Compose 환경에서는 `SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//oracle-db:1521/XEPDB1`처럼 서비스명을 사용하도록 정리 |
+| MinIO presigned URL이 브라우저에서 열리지 않음 | 백엔드는 `minio:9000`으로 접근하지만 브라우저는 Docker 내부 DNS 이름을 해석하지 못함 | 내부 접속용 `MINIO_URL`과 공개 접근용 `MINIO_PUBLIC_URL`을 분리해야 한다는 기준을 문서화 |
+| 보호 API 인증 실패와 권한 부족이 구분되지 않음 | Spring Security entry point와 access denied handler 응답 기준이 명확하지 않음 | 미로그인 접근은 401, 권한 부족은 403과 `ErrorResponseDTO`로 반환하도록 정리 |
+| 리뷰 수정 시 기존 이미지가 사라질 수 있음 | 기존 이미지는 presigned URL, 새 이미지는 object key로 전달되는데 모두 새 저장 값처럼 처리됨 | `http`로 시작하는 조회용 URL은 저장 대상에서 제외하고 새 object key가 있을 때만 이미지 매핑을 교체 |
+| 헤더 검색 리뷰가 이미지 수만큼 중복될 수 있음 | `review_images` 다중 조인으로 리뷰 row가 이미지 개수만큼 늘어남 | 검색 카드에는 대표 이미지 1장만 필요하므로 단일 이미지 조회로 응답 구조를 단순화 |
+| MinIO 업그레이드 후 인증 정보 바인딩 불일치 | access key/secret key 기준 설정과 root user/root password 환경 변수가 섞임 | `minio.root-user`, `minio.root-password` 기준으로 Spring properties, 설정 클래스, Docker 환경 변수를 통일 |
+
 ## 팀 구성 및 역할
 
 | 이름 | 역할 | 담당 영역 |
@@ -344,7 +409,7 @@ Baumann 피부 타입의 4가지 요소를 기준으로 사용자와 상품, 리
 ## 개선 예정 사항
 
 - `anyRequest().denyAll()` 전환을 위한 endpoint 테스트 보강
-- DB 초기화 SQL 및 샘플 데이터 정리
+- 실행 가능한 최신 DDL 및 샘플 데이터 SQL 분리
 - MinIO bucket 존재 확인 정책 추가
 - 주문, 포인트, 추천 서비스 테스트 추가
 - GitHub Actions CI 추가
