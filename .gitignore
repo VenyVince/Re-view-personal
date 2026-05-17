@@ -22,6 +22,7 @@ View/.env.*
 *.log
 *.tmp
 *.bak
+logs/Stable/
 
 # OS files
 .DS_Store
