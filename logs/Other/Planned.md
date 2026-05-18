@@ -1,0 +1,13 @@
+
+- [ ] Redis Session 적용 검토
+- [ ] 추천 결과 Redis Cache 적용 검토
+- [ ] GitHub Actions CI 추가
+- [ ] MinIO 리버스 프록시/도메인 정리
+- [ ] MinIO 내부 URL과 공개 URL 분리
+- [ ] public endpoint 기준 presigned URL 발급
+- [ ] MinIO bucket 존재 확인
+- [ ] MinIO 업로드 파일 검증
+- [ ] MinIO 이미지 리사이징 검토
+- [ ] MinIO 바이러스 검사 검토
+- [ ] 주문/포인트 테스트 추가
+- [ ] 추천 서비스 테스트 추가
