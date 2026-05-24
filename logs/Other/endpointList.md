@@ -600,3 +600,17 @@ Day 4 적용 전 확인:
 - `GET /api/qna/{qna_id}`를 공개로 둘지 로그인 필요로 둘지 비밀글 정책 확인 필요.
 - `/api/images/products/**`는 리뷰 사용자용과 관리자 상품용을 분리하는 편이 좋음.
 - 컨트롤러/서비스 단에서 리소스 소유자 검증이 빠진 곳이 있는지 별도 확인 필요.
+
+## [참고] 현재 SecurityConfig 기반 API 권한 분류표 (Day 3 기준)
+
+| 분류 | Endpoint 패턴 | 권한 (Role) | 비고 |
+| :--- | :--- | :--- | :--- |
+| **Swagger** | `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` | `PermitAll` | API 문서 관련 리소스 |
+| **Admin** | `/api/admin/**` | `ROLE_ADMIN` | 관리자 기능 전용 |
+| **User** | `/api/mypage/**` | `ROLE_USER` | 마이페이지 관련 (실제 API와 불일치) |
+| **Public** | `/**` (그 외 모든 요청) | `PermitAll` | 로그인 없이 접근 가능 (anyRequest) |
+
+### 설정 분석 및 보안 취약점
+1. **`/api/mypage/**` 매칭 오류**: 현재 `/api/users/me/**`, `/api/orders/**`, `/api/cart/**` 등 실제 인증이 필요한 대부분의 API가 이 패턴에 걸리지 않습니다.
+2. **과도한 허용 (`anyRequest().permitAll()`)**: 명시된 패턴 외의 모든 API가 공개되어 있습니다. 리뷰 작성, 주문 생성, 장바구니 조작 등 로그인 필수 기능들이 현재 설정상으로는 비로그인 상태에서도 접근 가능할 수 있는 보안 취약점이 존재합니다.
+3. **HTTP Method 미세 조정 부재**: 같은 URL이라도 GET(조회)은 허용하고 POST/PATCH/DELETE는 차단하는 등의 세부 제어가 적용되어 있지 않습니다.
