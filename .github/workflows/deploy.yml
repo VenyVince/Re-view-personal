@@ -8,13 +8,11 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted  # Use runner on EC2
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           clean: false
-
       - name: Create .env from secrets  # Make ".env" from Git Secrets
         run: |
           cd infra
@@ -23,17 +21,14 @@ jobs:
         run: |
           cd View
           echo "REACT_APP_API_BASE_URL=${{ secrets.REACT_APP_API_BASE_URL }}" > .env.production
-
       - name: Stop & remove previous containers # Docker compose down
         run: |
           cd infra
           docker compose down || true
-
       - name: Build new containers              # Build Container
         run: |
           cd infra
           docker compose build --no-cache
-
       - name: Start containers                   # Docker Compose Up
         run: |
           cd infra
