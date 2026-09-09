@@ -68,6 +68,7 @@ frontend/node_modules
 
 ### etc ###
 infra/.env
+!infra/.env.dev
 infra/ec2_env/*
 
 

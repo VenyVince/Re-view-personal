@@ -1,0 +1,16 @@
+{
+  "name": "Re:View Fullstack Dev (Spring Boot + React + Oracle XE + MinIO)",
+  "install": "bash .cursor/dev-install.sh",
+  "start": "bash .cursor/dev-start.sh",
+  "terminals": [
+    {
+      "name": "backend",
+      "command": "set -a; . ./.cursor/backend-dev.env; set +a; ./mvnw -DskipTests spring-boot:run"
+    },
+    {
+      "name": "frontend",
+      "command": "BROWSER=none PORT=3000 npm --prefix View start"
+    }
+  ],
+  "ports": [3000, 8080, 9000, 9001, 1521]
+}
