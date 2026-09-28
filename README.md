@@ -59,7 +59,7 @@
 | Data | Oracle XE, MinIO (Presigned URL) |
 | Infra | Docker Compose, Nginx, GitHub Actions (self-hosted runner on EC2) |
 
-### 기능 포인트
+### 주요 구현 내용
 
 - **가중치식 추천** — 바우만 4축 일치 + 리뷰 수·별점 유사도 + 베스트 가중치, 상품당 리뷰 1개
 - **Presigned URL 이미지 파이프라인** — 파일은 BE가 받지 않음. Presigned 발급, DB에는 object key
@@ -72,9 +72,9 @@
 
 ## 2. 프로젝트 구조
 
-### 주요 ERD
+### 주요 ERD (추후 수정 예정)
 
-추후 수정 예정. 현재는 핵심 관계만 표시. 이미지 URL 컬럼은 object key.
+현재는 핵심 관계만 표시. 이미지 URL 컬럼은 object key.
 
 ```mermaid
 erDiagram
@@ -157,7 +157,7 @@ FE 파일명 요청
   → 조회 API: key → 단기 GET URL
 ```
 
-배포 경로 (`main` push):
+배포경로 (main 브랜치 push 시):
 
 ```
 GitHub Actions (self-hosted on EC2)
@@ -166,7 +166,7 @@ GitHub Actions (self-hosted on EC2)
   → docker compose build --no-cache && up -d
 ```
 
-이미지에 `.env`를 굽지 않음. 로컬 실행:
+Docker 이미지 빌드에 `.env`를 넣지 않음. 실행 시 `env_file`·Secrets로 주입. 로컬 실행:
 
 ```bash
 cp infra/.env.example infra/.env
@@ -277,4 +277,4 @@ Compose로 Oracle·MinIO·BE·FE 일괄 기동. Actions self-hosted runner가 Se
 - Presigned URL 구분이 `startsWith("http")`
 - main 테스트는 `contextLoads()` 수준
 
-다음 작업: deny-by-default, 중복 체크를 lock 뒤로, 이미지 요청 DTO 분리, 보안 테스트 main 병합.
+다음 작업: deny-by-default, 중복 체크를 lock 뒤로, 이미지 요청 DTO 분리, 보안 테스트 main 병합, 단위 테스트.
