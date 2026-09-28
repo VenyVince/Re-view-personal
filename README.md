@@ -5,7 +5,7 @@
 
 프론트 화면의 대부분은 다른 팀원 작업입니다. 이 README는 **백엔드·인프라를 맡은 제 기여**를 기준으로 썼습니다.
 
-[시연 영상](https://www.youtube.com/watch?v=kP2HrcrGmvU) · [포트폴리오(문서)](https://github.com/VenyVince/Re_View_Doc)
+[시연 영상](https://www.youtube.com/watch?v=kP2HrcrGmvU) · [포트폴리오](https://app.notion.com/p/3e4e8ff09ebd803397fcf7744f36391e) · [문서](https://github.com/VenyVince/Re_View_Doc)
 
 ---
 
