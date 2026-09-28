@@ -1,159 +1,256 @@
-# Re_View
+# Re:View
 
-리뷰 기반 개인 맞춤 스킨케어 추천 커머스 프로젝트
+바우만 피부타입 기준으로 화장품 리뷰와 상품을 연결하는 팀 커머스입니다.  
+리뷰가 많아도 “나와 비슷한 피부의 후기”를 찾기 어려워서, 4축 점수 추천과 베스트 리뷰 선정으로 그 간극을 줄이려 했습니다.
 
-Re_View는 사용자 리뷰와 Baumann 피부 타입 데이터를 활용해 스킨케어 상품과 리뷰를 추천하는 풀스택 팀 프로젝트입니다. 단순 상품 조회 중심의 쇼핑몰이 아니라, 사용자 피부 타입, 상품 타깃 피부 타입, 리뷰 작성자의 피부 타입, 리뷰 반응 데이터를 함께 반영해 구매 판단에 도움이 되는 추천 흐름을 구현하는 데 초점을 두었습니다.
+프론트 화면의 대부분은 다른 팀원 작업입니다. 이 README는 **백엔드·인프라를 맡은 제 기여**를 기준으로 썼습니다.
 
-| 구분 | 링크 |
+[시연 영상](https://www.youtube.com/watch?v=kP2HrcrGmvU) · [포트폴리오(문서)](https://github.com/VenyVince/Re_View_Doc)
+
+---
+
+## 1. 프로젝트 개요
+
+### 주제
+
+피부타입(바우만 16타입)을 회원·상품·리뷰에 붙인 뒤, **같은 축이 많이 겹치는 상품·후기**를 먼저 보여 주는 스킨케어 리뷰 커머스입니다. 일반적인 쇼핑몰 CRUD에 추천 랭킹, 이미지 object storage, 리뷰 보상 포인트를 얹었습니다.
+
+### 일정 · 인원 · 역할
+
+| | |
 | --- | --- |
-| 프로젝트 문서 | https://github.com/VenyVince/5.Re_View_Doc |
-| 시연 영상 | https://www.youtube.com/watch?v=kP2HrcrGmvU |
+| 팀 개발 | 2025.10 – 2025.12 |
+| 개인 보강 | 2026.05 (인가 matcher, 예외/Validation, 스케줄러 활성화) |
+| 인원 | 6명 |
+| 내 역할 | 팀장 / 백엔드 / 인프라 |
 
-## 목차
+**내가 맡은 범위:** 검색, 마이페이지(회원정보·장바구니·찜·결제수단·포인트), MinIO 이미지, 바우만 추천 SQL, 월간 베스트 리뷰 스케줄러, Docker Compose, GitHub Actions EC2 배포, Spring Security 정리
 
-- [주요 기능](#주요-기능)
-- [기술 스택](#기술-스택)
-- [시스템 구조](#시스템-구조)
-- [핵심 구현 내용](#핵심-구현-내용)
-- [본인 기여도](#본인-기여도)
-- [트러블슈팅](#트러블슈팅)
-- [검증 결과](#검증-결과)
-- [팀 구성 및 역할](#팀-구성-및-역할)
+### 스택
 
-## 주요 기능
+| 구분 | 기술 |
+| --- | --- |
+| Backend | Java 21, Spring Boot 3, Spring Security(세션 + CSRF), MyBatis, Validation, Swagger |
+| Frontend | React, axios (`withCredentials`) |
+| Data | Oracle XE, MinIO (Presigned URL) |
+| Infra | Docker Compose, Nginx, GitHub Actions (self-hosted runner on EC2) |
 
-### 사용자
+### 기능적 포인트 (채용 관점에서 볼 곳)
 
-- 회원가입, 로그인, 로그아웃
-- 상품 목록 및 상세 조회
-- 리뷰 작성, 조회, 수정, 삭제
-- 리뷰 좋아요, 싫어요, 댓글, 신고
-- 장바구니, 위시리스트, 주문 처리
-- 포인트 적립 및 사용
-- 주소 및 결제수단 관리
-- QnA 작성 및 조회
-- Baumann 피부 타입 등록 및 수정
-- 피부 타입 기반 상품 및 리뷰 추천
+1. **추천이 필터가 아니라 점수식** — 바우만 4축 일치 + 리뷰 수/별점 유사도 + 베스트 가중치, 상품당 리뷰 1개
+2. **이미지는 서버가 파일을 받지 않음** — Presigned URL 발급, DB에는 object key만 저장
+3. **포인트는 조회-계산-갱신을 row lock으로 묶음** — `SELECT … FOR UPDATE`
+4. **배포가 로컬에서 끊기지 않음** — Oracle / MinIO / BE / FE를 Compose로 묶고 Actions로 EC2에 올림
 
-### 관리자
+기술 선택 근거는 이력서와 같습니다. 복잡한 추천 SQL을 직접 쓰기 위해 MyBatis, 비용·로컬 재현을 위해 S3 대신 MinIO, 이미 SPA가 세션 쿠키를 쓰므로 JWT로 갈아엎지 않고 CSRF를 맞췄습니다.
 
-- 상품 등록, 수정, 삭제
-- 주문 상태 관리
-- 사용자 관리 및 밴 처리
-- 사용자 포인트 관리
-- 리뷰 관리 및 관리자 추천 리뷰 선정
-- 리뷰 신고 처리
-- QnA 답변 관리
+---
 
-## 기술 스택
+## 2. 프로젝트 구조
 
-### Backend
+### 주요 ERD
 
-- Java 21
-- Spring Boot 3.5
-- Spring Security
-- MyBatis
-- Oracle XE
-- Spring Mail
-- springdoc OpenAPI / Swagger
-- MinIO SDK
-- Lombok
+핵심만 그렸습니다. 이미지 URL 컬럼은 **object key**를 담습니다.
 
-### Frontend
+```mermaid
+erDiagram
+    BAUMANN ||--o{ USER_TABLE : "피부타입"
+    BAUMANN ||--o{ PRODUCT : "추천축"
+    USER_TABLE ||--o{ REVIEW : writes
+    USER_TABLE ||--o{ POINT_HISTORY : earns
+    USER_TABLE ||--o{ CART_ITEMS : has
+    USER_TABLE ||--o{ WISH_ITEM : has
+    USER_TABLE ||--o{ PAYMENT_METHODS : has
+    USER_TABLE ||--o{ ORDERS : places
+    PRODUCT ||--o{ REVIEW : has
+    PRODUCT ||--o{ PRODUCT_IMAGE : "thumb/detail"
+    PRODUCT ||--o{ CART_ITEMS : in
+    REVIEW ||--o{ REVIEW_IMAGES : has
+    REVIEW ||--o{ POINT_HISTORY : reward
+    ORDERS ||--o{ ORDER_ITEM : contains
+    PRODUCT ||--o{ ORDER_ITEM : sold
 
-- React
-- React Router
-- Axios
-- Styled Components
-- React Icons
-
-### Infra
-
-- Docker
-- Docker Compose
-- Nginx
-- Oracle XE
-- MinIO
-
-## 시스템 구조
-
-<이미지 삽입 예정 - AWS EC2배포시 이미지 삽입 예정>
-
-### 백엔드 패키지 구조
-
-```text
-src/main/java/com/review/shop
-├── config          # Security, CORS, 예외 처리 설정
-├── controller      # REST API Controller
-├── service         # 비즈니스 로직
-├── repository      # MyBatis Mapper Interface
-├── dto             # 요청 / 응답 DTO
-├── image           # MinIO 이미지 처리
-├── exception       # 커스텀 예외
-└── util            # 인증 유틸, 스케줄러
+    BAUMANN {
+        int baumann_id PK
+        string first
+        string second
+        string third
+        string fourth
+        string type
+    }
+    USER_TABLE {
+        int user_id PK
+        int baumann_id FK
+        int point
+        string role
+    }
+    PRODUCT {
+        int product_id PK
+        int baumann_id FK
+        int review_count
+        float rating
+    }
+    REVIEW {
+        int review_id PK
+        int user_id FK
+        int product_id FK
+        int like_count
+        int is_checked
+        int is_selected
+    }
+    POINT_HISTORY {
+        int point_history_id PK
+        int user_id FK
+        int review_id FK
+        int amount
+        string type
+    }
 ```
 
-## 핵심 구현 내용
+회원·상품이 같은 `BAUMANN`을 공유하고, 추천 SQL이 이 4축을 점수로 바꿉니다. 베스트 리뷰는 `REVIEW.is_checked`, 운영자 픽은 `is_selected`입니다. 포인트 잔액은 `USER_TABLE.point`, 이력은 `POINT_HISTORY`입니다.
 
-### Baumann 피부 타입 기반 추천
+### 서버 · 배포 구조
 
-Baumann 피부 타입의 4가지 요소를 기준으로 사용자와 상품, 리뷰의 적합도를 계산했습니다. 상품 추천은 상품 피부 타입 적합도와 리뷰 수 기반 점수를 합산한 `total_score`를 사용하고, 리뷰 추천은 리뷰 작성자의 피부 타입 일치도와 리뷰 반응 데이터를 반영한 `total_score`를 기준으로 정렬했습니다.
+```
+Browser
+  ├─ :3000  React (nginx가 /api → BE)
+  └─ :9000  MinIO  ← FE가 Presigned URL로 PUT/GET
+         │
+EC2 (Docker Compose)
+  ├─ fe      nginx :80 → host 3000
+  ├─ be      Spring :8080
+  ├─ oracle  XE :1521
+  └─ minio   :9000 / console :9001
+```
 
-### MinIO Presigned URL 기반 이미지 처리
+이미지 경로:
 
-백엔드가 파일 바이너리를 직접 저장하지 않고 MinIO Presigned URL을 발급하는 구조로 구현했습니다. 프론트엔드는 발급받은 URL로 이미지를 업로드하고, 백엔드는 object key를 DB에 저장해 조회 URL 생성 책임을 분리했습니다.
+```
+FE 파일명 요청
+  → BE: PUT Presigned URL + object key
+  → FE: MinIO에 바이너리 업로드
+  → 리뷰/상품 API: key만 DB 저장
+  → 조회 API: key → 단기 GET URL
+```
 
-### 주문 / 포인트 / 재고 트랜잭션 처리
+배포 경로 (`main` push):
 
-주문 처리 과정에서 사용자 포인트 차감, 상품 재고 차감, 주문 정보 저장, 주문 상세 정보 저장을 하나의 트랜잭션으로 처리했습니다. 클라이언트가 전달한 가격을 그대로 신뢰하지 않고 서버에서 상품 가격을 다시 조회해 최종 금액을 계산하도록 했습니다.
+```
+GitHub Actions (self-hosted on EC2)
+  → Secrets로 infra/.env, View/.env.production 생성
+  → docker compose down
+  → docker compose build --no-cache && up -d
+```
 
-### 리뷰 보상 시스템
+이미지에 `.env`를 굽지 않습니다. 로컬 실행:
 
-구매 상품 리뷰 작성 시 포인트를 지급하고, 리뷰 삭제 시 지급된 포인트를 회수하도록 구현했습니다. 베스트 리뷰는 매월 1일 00:00(서울 기준)에 자동 갱신되며, 동일 리뷰에 보상이 중복 지급되지 않도록 포인트 이력을 기준으로 확인합니다.
+```bash
+cp infra/.env.example infra/.env
+cd infra && docker compose up -d --build
+```
 
-
-## 본인 기여도
-
-| 영역 | 기여 내용 |
+| | |
 | --- | --- |
-| 백엔드/인프라 안정화 | 로컬 실행 환경을 점검하고 DB, MinIO, CORS, 환경 변수 문제를 코드 문제와 분리해 정리했습니다. |
-| 보안 정책 정리 | 세션 인증 방식을 유지하면서 공개 API, 인증 필요 API, 관리자 API를 분류하고 `SecurityConfig` matcher에 반영했습니다. |
-| 예외 응답 표준화 | 인증 실패 401, 권한 부족 403을 분리하고 `ErrorResponseDTO` 기반 공통 JSON 응답으로 정리했습니다. |
-| 이미지 처리 | MinIO presigned URL 기반 업로드/조회 흐름을 유지하면서 object key와 조회용 URL의 책임을 분리했습니다. |
-| 추천/리뷰 보상 검증 | Baumann 기반 추천 점수와 리뷰 작성/삭제/베스트/관리자 선정 보상 흐름을 코드 기준으로 확인했습니다. |
+| FE | http://localhost:3000 |
+| Swagger | http://localhost:8080/swagger-ui.html |
+| MinIO | http://localhost:9001 |
 
-## 트러블슈팅
+Oracle XE는 첫 기동이 깁니다.
 
-| 문제 | 원인 | 해결 |
-| --- | --- | --- |
-| MinIO presigned URL이 브라우저에서 열리지 않음 | 백엔드는 `minio:9000`으로 접근하지만 브라우저는 Docker 내부 DNS 이름을 해석하지 못함 | 내부 접속용 URL과 브라우저 접근용 URL을 분리 |
-| 보호 API 인증 실패와 권한 부족이 구분되지 않음 | Spring Security entry point와 access denied handler 응답 기준이 명확하지 않음 | 미로그인 접근은 401, 권한 부족은 403과 `ErrorResponseDTO`로 반환하도록 정리 |
-| 리뷰 수정 시 기존 이미지가 사라질 수 있음 | 기존 이미지는 조회 URL, 새 이미지는 object key로 전달되는데 모두 새 저장 값처럼 처리됨 | `http`로 시작하는 조회용 URL은 저장 대상에서 제외하고 새 object key가 있을 때만 이미지 매핑을 교체 |
-| 헤더 검색 리뷰가 이미지 수만큼 중복될 수 있음 | `review_images` 다중 조인으로 리뷰 row가 이미지 개수만큼 늘어남 | 검색 카드에는 대표 이미지 1장만 필요하므로 단일 이미지 조회로 응답 구조를 단순화 |
+---
 
-## 검증 결과
+## 3. 프로젝트 주요 기능
 
-- 백엔드 테스트: `mvnw.cmd test` 통과
-- 프론트 빌드: `npm --prefix View run build` 성공
-- 남은 경고: Mockito 동적 Java agent 로딩 경고, SpringDoc 운영 환경 비활성화 권장 경고, React Hook dependency와 미사용 변수/import 중심의 ESLint 경고
+### 3-1. 내가 구현한 것
 
-## 주요 ERD
+#### 바우만 추천 스코어링
 
-<이미지 삽입 예정>
+로그인 사용자의 `BAUMANN` 4축(건성/지성, 민감, 색소, 탄력/주름)을 읽고 상품·리뷰를 점수순으로 자릅니다.
 
-## 팀 구성 및 역할
+- 상품: 축 일치 30 / null 10 / 불일치 0 + 리뷰 수 가점, **40점 이상**, 상위 16개
+- 리뷰: 작성자 타입 + 상품 타입 + 별점 유사도. 베스트(`is_checked`)는 ×1.2
+- `ROW_NUMBER() PARTITION BY product_id`로 **상품당 후기 1개**
+- 리뷰 이미지가 없으면 상품 썸네일로 대체한 뒤 Presigned GET으로 변환
 
-| 이름 | 역할 | 담당 영역 |
-| --- | --- | --- |
-| 김석현 | 팀장 / 백엔드 / 인프라 | DB 설계, 회원, 포인트, 결제수단, 장바구니, 이미지 처리, 추천 알고리즘, MinIO |
-| 이재빈 | 백엔드 | 로그인, 결제, 구매, 추천 알고리즘 |
-| 정윤성 | 백엔드 | 상품, 리뷰, QnA, 커뮤니티 |
-| 오승환 | 프론트엔드 | 마이페이지 전체 UI |
-| 김시연 | 프론트엔드 | 관리자 페이지, 설문조사 UI |
-| 박진성 | 프론트엔드 | 검색, 상품, 리뷰 페이지 UI |
+“같은 타입만 WHERE”가 아니라 점수로 줄 세운 이유는, 완전 일치 행이 비면 추천이 공백이 되기 때문입니다.
 
-## 참고 문서
+#### 이미지 파이프라인 (MinIO Presigned URL)
 
-- [작업 계획](logs/Stable/Plan.md)
-- [ERD 메모](logs/Other/ERD.md)
-- [트러블슈팅 메모](logs/Other/TS.md)
+로컬 디스크 업로드에서 object storage로 옮겼습니다. BE는 multipart를 받지 않습니다.
+
+트러블슈팅: 리뷰 수정 시 FE가 화면에 쓰던 **GET Presigned URL**을 그대로 내려보내, 만료 URL이 object key처럼 DB에 저장됐습니다. `http`로 시작하면 무시하고, 신규 key가 있을 때만 이미지를 갈아끼웁니다. key가 없으면 기존 매핑을 유지합니다.
+
+내부 Docker 호스트(`minio:9000`)로 서명하면 브라우저가 이미지를 못 여는 문제는 인지했습니다. 공개/내부 클라이언트 분리는 후처리(스캔·리사이즈)가 없어 이점이 작다고 보고 **보류**했고, 현재 코드는 클라이언트 1개입니다.
+
+#### 검색
+
+헤더·관리자 검색을 같은 서비스로 제공합니다. 키워드 2글자 이상, 상품+리뷰, 정렬(최신/별점/인기 등), 브랜드·카테고리 필터. 결과 이미지도 object key → Presigned URL입니다. 관리자 주문 검색은 상태/정렬을 서비스에서 한 번 더 거릅니다.
+
+#### 포인트 · 월간 베스트 리뷰
+
+리뷰 작성 100 / 운영자 채택 500 / 베스트 700. 잔액 갱신은 `USER_TABLE`을 `SELECT … FOR UPDATE`한 뒤 트랜잭션 안에서 계산합니다. “잔액이 어긋나는 현상을 운영에서 잡았다”가 아니라, 조회-계산-갱신 레이스가 날 수 있어 막았습니다.
+
+베스트 선정 SQL: 좋아요 20 초과 · 상품 리뷰 30 초과, 상품별 좋아요→싫어요→댓글 상위 **10%**. 매월 1일 0시(`Asia/Seoul`). 스케줄러 클래스는 팀 기간에 있었고, **`@EnableScheduling`이 없어 안 돌던 것을 2026.05에 켰습니다.**
+
+남은 구멍: 베스트 포인트 **중복 체크가 lock보다 앞**에 있습니다. 다음은 락 이후 체크로 옮기는 것입니다.
+
+#### 마이페이지 API
+
+회원정보 조회/수정/탈퇴, 바우만 타입 변경, 장바구니 CRUD, 찜, 결제수단, 포인트 내역. 목록 썸네일은 전부 Presigned GET으로 바꿉니다.
+
+#### 배포 · 보안 보강
+
+Compose로 Oracle·MinIO·BE·FE를 한 번에 올리고, Actions self-hosted runner가 Secrets로 env를 만든 뒤 `compose up` 합니다.
+
+2026.05에 공개/인증/관리자 matcher를 나누고 401/403을 JSON으로 맞춰 CSRF 쿠키 + axios 헤더, DTO Validation, 전역 예외 처리를 붙였습니다. **마지막은 `anyRequest().permitAll()`이라 목록 밖 API는 아직 열려 있습니다.** 보안 테스트는 `testcode` 브랜치에만 있습니다.
+
+---
+
+### 3-2. 다른 팀원이 맡은 것 (요약)
+
+| 영역 | 내용 |
+| --- | --- |
+| 인증·회원 | 회원가입/로그인(세션), 아이디·임시 비밀번호, 바우만 설문 |
+| 상품 | 목록/상세, 관리자 상품 등록·수정 |
+| 리뷰 | 작성·수정·삭제, 댓글, 좋아요/싫어요, 상세 페이지 |
+| 주문 | 재고 차감, 주문 생성, 배송 상태, 관리자 주문 |
+| QnA · 신고 | 상품 QnA, 리뷰 신고, 관리자 처리 |
+| 프론트 | 메인/검색/리뷰 피드, 결제 화면, 관리자 UI 대부분 |
+
+주문 재고는 조회 후 차감이 아니라 **차감 row 수로 실패를 판단**하는 쪽으로 팀에서 정리했습니다. 포인트 갱신은 위에서 만든 `PointService`를 주문 쪽에서 호출합니다.
+
+---
+
+## 4. 주요 코드맵 (내가 작성·주도한 파일)
+
+리뷰어가 열 파일만 적었습니다. 프론트 화면 파일은 제외합니다.
+
+| 보고 싶은 것 | 경로 |
+| --- | --- |
+| 추천 점수식 | `src/main/resources/mapper/recommendations/RecommendationsMapper.xml` |
+| 추천 서비스 | `src/main/java/com/review/shop/service/recommendations/RecommendationsService.java` |
+| Presigned 발급/조회 | `src/main/java/com/review/shop/image/ImageService.java` |
+| MinIO 클라이언트 | `src/main/java/com/review/shop/image/minio/MinioConfig.java` |
+| 리뷰 수정 시 URL≠key | `ProductReviewService.filterObjectKeys` |
+| 헤더/관리자 검색 | `.../service/search/HeaderSearchService.java` |
+| 검색 SQL | `mapper/search/header/HeaderSearchReviewMapper.xml` |
+| 포인트 + row lock | `.../service/userinfo/other/PointService.java` |
+| `FOR UPDATE` | `mapper/userinfo/other/point/PointMapper.xml` |
+| 베스트 선정 SQL | `mapper/review/ProductreviewMapper.xml` (`selectBestReviewIds`) |
+| 월간 스케줄러 | `.../util/ReviewScheduler.java` (`@EnableScheduling`은 `ReViewApplication`) |
+| 장바구니/찜/결제수단 | `controller/userinfo/*`, `service/userinfo/other/*` |
+| 인가 · 401/403 | `.../config/SecurityConfig.java` |
+| 전역 예외 | `.../config/ExceptionHandlers.java` |
+| Compose | `infra/docker-compose.yml` |
+| CI/CD | `.github/workflows/deploy.yml` |
+
+---
+
+## 한계
+
+- `anyRequest().permitAll()`, `/minio/test` 잔존
+- 베스트 포인트 중복 체크가 lock보다 앞
+- Presigned URL 구분이 `startsWith("http")`
+- main 테스트는 `contextLoads()` 수준
+
+다음에 할 일: deny-by-default, 중복 체크를 lock 뒤로, 이미지 요청 DTO 분리, 보안 테스트 main 병합.
