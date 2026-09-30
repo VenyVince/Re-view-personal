@@ -74,9 +74,7 @@ MBTI와 같이 피부 타입을 건성/지성·민감·색소·탄력/주름 네
 
 ## 2. 프로젝트 구조
 
-### 주요 ERD
-
-핵심 관계만 표시. 이미지 URL 컬럼은 object key.
+### 핵심 ERD
 
 ![핵심 ERD](docs/images/erd-core.png)
 
