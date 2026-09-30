@@ -103,16 +103,6 @@ EC2 (Docker Compose)
   └─ minio   :9000 / console :9001
 ```
 
-이미지 경로:
-
-```
-FE 파일명 요청
-  → BE: PUT Presigned URL + object key
-  → FE: MinIO에 바이너리 업로드
-  → 리뷰/상품 API: key만 DB 저장
-  → 조회 API: key → 단기 GET URL
-```
-
 배포경로 (main 브랜치 push 시):
 
 ![main push 후 Actions → EC2 Compose](docs/images/deploy-flow.png)
@@ -161,6 +151,14 @@ Oracle XE 첫 기동은 시간이 김.
 #### Presigned URL 이미지 파이프라인
 
 로컬 디스크 업로드에서 object storage로 이전. BE는 multipart를 받지 않음.
+
+```
+FE 파일명 요청
+  → BE: PUT Presigned URL + object key
+  → FE: MinIO에 바이너리 업로드
+  → 리뷰/상품 API: key만 DB 저장
+  → 조회 API: key → 단기 GET URL
+```
 
 리뷰 수정 시 FE가 화면의 GET Presigned URL을 그대로 보내, 만료 URL이 object key처럼 저장되던 문제. `http`로 시작하면 무시, 신규 key가 있을 때만 교체. key가 없으면 기존 매핑 유지.
 
