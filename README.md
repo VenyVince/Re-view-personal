@@ -76,6 +76,10 @@
 
 현재는 핵심 관계만 표시. 이미지 URL 컬럼은 object key.
 
+![핵심 ERD](docs/images/erd-core.png)
+
+전체 관계:
+
 ```mermaid
 erDiagram
     BAUMANN ||--o{ USER_TABLE : "피부타입"
@@ -135,6 +139,8 @@ erDiagram
 
 ### 서버 · 배포 구조
 
+![EC2 Docker Compose 구성](docs/images/architecture-compose.png)
+
 ```
 Browser
   ├─ :3000  React (nginx가 /api → BE)
@@ -158,6 +164,10 @@ FE 파일명 요청
 ```
 
 배포경로 (main 브랜치 push 시):
+
+![main push 후 Actions → EC2 Compose](docs/images/deploy-flow.png)
+
+![deploy.yml 단계](docs/images/deploy-actions.png)
 
 ```
 GitHub Actions (self-hosted on EC2)
