@@ -80,8 +80,6 @@ MBTI와 같이 피부 타입을 건성/지성·민감·색소·탄력/주름 네
 
 ![핵심 ERD](docs/images/erd-core.png)
 
-회원·상품이 같은 `BAUMANN`을 공유하고, 추천 SQL이 4축을 점수로 변환. 베스트 리뷰는 `REVIEW.is_checked`, 운영자 픽은 `is_selected`. 포인트 잔액은 `USER_TABLE.point`, 이력은 `POINT_HISTORY`. 리뷰는 주문상품(`order_item_id`)에 묶인다.
-
 <details>
 <summary>전체 ERD</summary>
 
