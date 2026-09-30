@@ -9,22 +9,35 @@ import com.review.shop.util.Security_Util;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.http.Method;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Service
-@RequiredArgsConstructor
 public class ImageService {
 
     private final Security_Util security_util;
 
-    private final MinioClient minioClient;
+    private final MinioClient publicMinioClient;
     private final MinioProperties minioProperties;
     private final ImageMapper imageMapper;
+
+    public ImageService(
+            Security_Util security_util,
+            @Qualifier("publicMinioClient") MinioClient publicMinioClient,
+            MinioProperties minioProperties,
+            ImageMapper imageMapper
+    ) {
+        this.security_util = security_util;
+        this.publicMinioClient = publicMinioClient;
+        this.minioProperties = minioProperties;
+        this.imageMapper = imageMapper;
+    }
 
     // presigned url : 임의로 생성된 url(post, get요청등)
     // object key: 실질적인 저장소 키값
@@ -108,7 +121,7 @@ public class ImageService {
         String objectKey = folder + "/" + UUID.randomUUID() + ext;
 
         try {
-            String url = minioClient.getPresignedObjectUrl(
+            String url = publicMinioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.PUT)
                             .bucket(minioProperties.getBucket())
@@ -140,7 +153,7 @@ public class ImageService {
         String objectKey = folder + "/" + UUID.randomUUID() + ext;
 
         try {
-            String url = minioClient.getPresignedObjectUrl(
+            String url = publicMinioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.PUT)
                             .bucket(minioProperties.getBucket())
@@ -163,7 +176,7 @@ public class ImageService {
     // 조회 시 objectKey → presigned GET URL 변환
     public String presignedUrlGet(String objectKey) {
         try {
-            return minioClient.getPresignedObjectUrl(
+            return publicMinioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.GET)
                             .bucket(minioProperties.getBucket())
@@ -172,7 +185,7 @@ public class ImageService {
                             .build()
             );
         } catch (Exception e) {
-            throw new RuntimeException("[Minio] GET URL 생성 실패: " + e.getMessage());
+            throw new RuntimeException("GET URL 생성 실패: " + e.getMessage());
         }
     }
 
