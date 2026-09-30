@@ -63,80 +63,31 @@ MBTI와 같이 피부 타입을 건성/지성·민감·색소·탄력/주름 네
 
 ### 주요 구현 내용
 
-- **가중치식 추천** — 바우만 4축 일치 + 리뷰 수·별점 유사도 + 베스트 가중치, 상품당 리뷰 1개
-- **Presigned URL 이미지 파이프라인** — 파일은 BE가 받지 않음. Presigned 발급, DB에는 object key
-- **포인트 row lock** — 조회-계산-갱신을 `SELECT … FOR UPDATE`와 트랜잭션으로 묶음
-- **Compose 기반 EC2 배포** — Oracle / MinIO / BE / FE를 한 번에 올리고 Actions로 배포
+- **가중치식 추천** — 바우만 4축이 얼마나 겹치는지를 보고, 리뷰 수·별점 유사도·베스트 가중치까지 더해 상품당 후기 하나를 골라 줍니다.
+- **Presigned URL 이미지 파이프라인** — 파일은 백엔드가 받지 않고, Presigned URL만 발급한 뒤 DB에는 object key만 남깁니다.
+- **포인트 row lock** — 잔액을 조회하고 계산한 뒤 갱신하는 동안 `SELECT … FOR UPDATE`로 한 트랜잭션에 묶어 두었습니다.
+- **Compose 기반 EC2 배포** — Oracle / MinIO / BE / FE를 한 번에 올리고, GitHub Actions로 배포합니다.
 
-기술 선택. 추천 SQL 직접 제어 → MyBatis. 비용·로컬 재현 → S3 대신 MinIO. 세션 SPA 유지 → JWT 교체 없이 CSRF 정합.
+추천 SQL을 직접 다루고 싶어서 MyBatis를 썼고, 비용과 로컬 재현을 생각해 S3 대신 MinIO를 골랐습니다. 세션 기반 SPA를 유지하려고 JWT로 바꾸지 않고 CSRF만 맞춰 두었습니다.
 
 ---
 
 ## 2. 프로젝트 구조
 
-### 주요 ERD (추후 수정 예정)
+### 주요 ERD
 
-현재는 핵심 관계만 표시. 이미지 URL 컬럼은 object key.
+핵심 관계만 표시. 이미지 URL 컬럼은 object key.
 
 ![핵심 ERD](docs/images/erd-core.png)
 
-전체 관계:
+회원·상품이 같은 `BAUMANN`을 공유하고, 추천 SQL이 4축을 점수로 변환. 베스트 리뷰는 `REVIEW.is_checked`, 운영자 픽은 `is_selected`. 포인트 잔액은 `USER_TABLE.point`, 이력은 `POINT_HISTORY`. 리뷰는 주문상품(`order_item_id`)에 묶인다.
 
-```mermaid
-erDiagram
-    BAUMANN ||--o{ USER_TABLE : "피부타입"
-    BAUMANN ||--o{ PRODUCT : "추천축"
-    USER_TABLE ||--o{ REVIEW : writes
-    USER_TABLE ||--o{ POINT_HISTORY : earns
-    USER_TABLE ||--o{ CART_ITEMS : has
-    USER_TABLE ||--o{ WISH_ITEM : has
-    USER_TABLE ||--o{ PAYMENT_METHODS : has
-    USER_TABLE ||--o{ ORDERS : places
-    PRODUCT ||--o{ REVIEW : has
-    PRODUCT ||--o{ PRODUCT_IMAGE : "thumb/detail"
-    PRODUCT ||--o{ CART_ITEMS : in
-    REVIEW ||--o{ REVIEW_IMAGES : has
-    REVIEW ||--o{ POINT_HISTORY : reward
-    ORDERS ||--o{ ORDER_ITEM : contains
-    PRODUCT ||--o{ ORDER_ITEM : sold
+<details>
+<summary>전체 ERD</summary>
 
-    BAUMANN {
-        int baumann_id PK
-        string first
-        string second
-        string third
-        string fourth
-        string type
-    }
-    USER_TABLE {
-        int user_id PK
-        int baumann_id FK
-        int point
-        string role
-    }
-    PRODUCT {
-        int product_id PK
-        int baumann_id FK
-        int review_count
-        float rating
-    }
-    REVIEW {
-        int review_id PK
-        int user_id FK
-        int product_id FK
-        int like_count
-        int is_checked
-        int is_selected
-    }
-    POINT_HISTORY {
-        int point_history_id PK
-        int user_id FK
-        int review_id FK
-        int amount
-        string type
-    }
-```
+![전체 ERD](docs/images/erd-full.png)
 
+</details>
 
 ### 서버 · 배포 구조
 
