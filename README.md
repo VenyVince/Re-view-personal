@@ -1,10 +1,12 @@
 # Re:View
 
-바우만 피부타입 기준 화장품 리뷰·상품 연결 팀 커머스.  
-바우만 타입은 피부를 16종으로 나눈 분류로, 피부의 MBTI처럼 건성/지성·민감·색소·탄력/주름 네 축의 조합.  
-리뷰가 많아도 “비슷한 피부의 후기”를 찾기 어려운 문제를, 4축 가중치 추천과 베스트 리뷰 선정으로 보완.
+바우만 피부타입 기준으로하는 화장품 리뷰·상품 커머스입니다.
+MBTI와 같이 피부 타입을 건성/지성·민감·색소·탄력/주름 네 축의 조합을 가지고 16가지로 나눈 분류입니다.
+이 프로젝트는 리뷰가 많아도 “비슷한 피부의 후기”를 찾기 어려운 문제를, 4축 가중치 추천과 베스트 리뷰 선정으로 보완.
 
-프론트 화면 대부분은 팀원 작업. README는 백엔드·인프라 담당 범위 기준.
+바우만 피부 타입을 통해 명확한 기준이 없는 피부 타입을 최소한으로 규정할 수 있다는 점에서 해당 기준을 채택하였습니다.
+
+프론트 화면 대부분은 팀원들이 작업하였으며, README는 백엔드·인프라 담당 범위 Veny(김석현)의 기준입니다.
 
 [시연 영상](https://www.youtube.com/watch?v=kP2HrcrGmvU) · [포트폴리오](https://app.notion.com/p/3e4e8ff09ebd803397fcf7744f36391e) · [문서](https://github.com/VenyVince/Re_View_Doc)
 
@@ -14,7 +16,7 @@
 
 ### 주제
 
-회원·상품·리뷰에 바우만 16타입을 붙인 뒤, 겹치는 축이 많은 상품·후기를 앞에 두는 스킨케어 리뷰 커머스. 쇼핑몰 CRUD 위에 가중치 추천, object storage 이미지, 리뷰 보상 포인트.
+회원·상품·리뷰에 바우만 16타입을 붙인 뒤, 겹치는 축이 많은 상품·후기를 앞에 두는 스킨케어 리뷰 커머스입니다. 쇼핑몰 CRUD 위에 가중치 추천, object storage 이미지, 리뷰 보상 포인트 등을 다루고 있습니다.
 
 ### 일정 · 인원 · 역할
 
@@ -25,9 +27,16 @@
 | 인원 | 6명 |
 | 역할 | 팀장 / 백엔드 / 인프라 |
 
-### 담당 범위
+### 스택
 
-백엔드와 인프라를 맡았고, 화면 구현은 팀원 작업이 중심.
+| 구분 | 기술 |
+| --- | --- |
+| Backend | Java 21, Spring Boot 3, Spring Security(세션 + CSRF), MyBatis, Validation, Swagger |
+| Frontend | React, axios (`withCredentials`) |
+| Data | Oracle XE, MinIO (Presigned URL) |
+| Infra | Docker Compose, Nginx, GitHub Actions (self-hosted runner on EC2) |
+
+### 본인(Veny / 석현) 담당 범위
 
 #### 백엔드
 
@@ -50,14 +59,7 @@
 | 배포 | GitHub Actions self-hosted runner, EC2에서 Secrets 주입 후 `compose up` |
 | 프록시 | nginx 정적 서빙, `/api` → BE |
 
-### 스택
 
-| 구분 | 기술 |
-| --- | --- |
-| Backend | Java 21, Spring Boot 3, Spring Security(세션 + CSRF), MyBatis, Validation, Swagger |
-| Frontend | React, axios (`withCredentials`) |
-| Data | Oracle XE, MinIO (Presigned URL) |
-| Infra | Docker Compose, Nginx, GitHub Actions (self-hosted runner on EC2) |
 
 ### 주요 구현 내용
 
@@ -135,7 +137,6 @@ erDiagram
     }
 ```
 
-회원·상품이 같은 `BAUMANN`을 공유하고, 추천 SQL이 4축을 점수로 변환. 베스트 리뷰는 `REVIEW.is_checked`, 운영자 픽은 `is_selected`. 포인트 잔액은 `USER_TABLE.point`, 이력은 `POINT_HISTORY`.
 
 ### 서버 · 배포 구조
 
