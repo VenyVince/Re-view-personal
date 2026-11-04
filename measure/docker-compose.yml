@@ -1,0 +1,20 @@
+# Measurement Oracle only. Same image as infra/docker-compose.yml service oracle-db.
+# BE and FE are not built. infra/.env and ~/volumes/oracle-data are not used.
+services:
+  oracle-db:
+    image: gvenzl/oracle-xe:latest
+    container_name: measure-oracle
+    ports:
+      - "1522:1521"
+    environment:
+      ORACLE_PASSWORD: measure_oracle
+      APP_USER: MEASURE
+      APP_USER_PASSWORD: measure_local
+    volumes:
+      - measure-oracle-data:/opt/oracle/oradata
+      - ./oracle/init/10-load.sh:/container-entrypoint-initdb.d/10-load.sh:ro
+      - ./oracle/sql:/measure-sql:ro
+    shm_size: 1gb
+
+volumes:
+  measure-oracle-data:
