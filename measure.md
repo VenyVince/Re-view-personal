@@ -2,13 +2,13 @@
 
 계획의 기준 커밋은 `c95dd83d`다. 이 작업 트리의 HEAD는 `c84fbc3a`다. `src`, `infra`, `View`, 루트 `Dockerfile`은 `c95dd83d`와 같다. `.github/workflows/deploy.yml`은 빈 줄만 다르다. 단계, `self-hosted`, Secrets, `compose down`, `build --no-cache`, `up -d`는 같다.
 
-반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실과, 측정 프로파일로 확인한 적재 건수다.
+반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL이다.
 
 ## E0 결과 표
 
 | 이력서 문장 | 파일 경로 | 커밋 해시 | 조건 | 결과 | 한계 | 반영 판정 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 바우만 4기준 일치, 리뷰 수·별점 가중치, 부분 일치, `ROW_NUMBER`로 상품당 대표 리뷰 1개, MyBatis SQL | `src/main/resources/mapper/recommendations/RecommendationsMapper.xml`의 `findRecommendProducts`, `findRecommendReviews`. `src/main/java/com/review/shop/service/recommendations/RecommendationsService.java` | 현재 코드 `c95dd83d`. 추천 SQL 이력 `e7c2fa82`, `9b4be372`, `54d9aa3b` | 정답 픽스처의 4축 일치, 2축 일치, 상품당 리뷰 2개, `is_checked = 1`의 1.2배. 리뷰 2,000건에서 워밍업 2회 뒤 10회. `EXPLAIN PLAN` 1회 | 미측정 | 상품 쿼리에는 `ROW_NUMBER`가 없다. 과거 SQL 비교는 `e7c2fa82`를 30분 안에 실행할 때만 | 미판정 |
+| 바우만 4기준 일치, 리뷰 수·별점 가중치, 부분 일치, `ROW_NUMBER`로 상품당 대표 리뷰 1개, MyBatis SQL | `src/main/resources/mapper/recommendations/RecommendationsMapper.xml`의 `findRecommendProducts`, `findRecommendReviews`. `src/main/java/com/review/shop/service/recommendations/RecommendationsService.java` | 현재 코드 `c95dd83d`. 추천 SQL 이력 `e7c2fa82`, `9b4be372`, `54d9aa3b` | 정답 픽스처의 4축 일치, 2축 일치, 상품당 리뷰 2개, `is_checked = 1`의 1.2배. 리뷰 2,000건에서 워밍업 2회 뒤 10회. `EXPLAIN PLAN` 1회 | 아래 v0.3.0. 리뷰 16행, 상품 ID 중복 0건. 상품 1의 대표는 리뷰 2, 점수 72. 상품 쿼리 16행에 상품 1(120) 포함, 상품 2(60) 제외. 리뷰 2,000건에서 상품 쿼리 평균 2.357ms 최댓값 2.807ms, 리뷰 쿼리 평균 11.481ms 최댓값 13.299ms | 상품 쿼리 원문에는 `ROW_NUMBER`가 없다. 실행 계획의 `ROW_NUMBER`는 `FETCH FIRST 16`이다. `deleted_at` 조건은 없다. `e7c2fa82`에는 리뷰 추천 SQL이 없다. 개선율은 계산하지 않았다 | 미판정 |
 | 주문 상품에 연결해 실제 구매자만 리뷰를 작성. 주문 시점의 상품명·가격 저장. 포인트 잔액과 분리된 이력 | `ProductReviewService.canCreate`. `src/main/resources/mapper/order/OrderItemIdMapper.xml`. `OrdersMapper.xml`의 `ORDER_ITEM.PRODUCT_NAME`, `PRODUCT_PRICE`. `src/main/resources/mapper/userinfo/other/point/PointMapper.xml` | 현재 코드 `c95dd83d` | 주문상품 없음, 타인 `order_item_id`, 이미 리뷰가 있는 `order_item_id`, 본인 주문상품 각 1건. 주문 후 상품명·가격 변경. `usePoint` 1건. 재고 부족 예외 뒤 주문 행과 포인트 이력 | 미측정 | 거절 메시지는 하나로 묶인다. 단일 트랜잭션 문장은 이력서에 없다 | 미판정 |
 | 사용자 행을 잠그고 같은 트랜잭션에서 계산·갱신 | `src/main/resources/mapper/userinfo/other/point/PointMapper.xml`의 `selectForUpdate`. `src/main/java/com/review/shop/service/userinfo/other/PointService.java`의 `updateUserPoint`, `addReviewPoint`, `usePoint`, `addBestReviewPoint` | 락이 들어온 커밋 `1d954cca`. 확인 순서 변경은 이번 측정에서 `PointService`에 반영 | 사용자 1명, 시작 잔액 10,000, 적립 100과 차감 100을 섞어 20개 동시, 5번 반복. 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드 1회 | 일반 잔액·이력 불일치 0건. 수정 전 베스트 700원 EARN 9행. 잠금 뒤 확인으로 바꾼 재측정은 1행. 아래 v0.2.0 | `getCurrentUserRole()`은 잠금을 잡은 뒤 로그인 아이디로 `USER_TABLE.role`을 다시 조회한다. `point_history`에는 중복 방지 유니크 제약이 없다 | 미판정 |
 | 리뷰 수정 시 `http` URL은 무시하고, 새 object key가 있을 때만 교체 | `src/main/java/com/review/shop/service/review/ProductReviewService.java`의 `filterObjectKeys`, `updateReview` | 필터 커밋 `63521f66`. 현재 코드 `c95dd83d` | `images`가 비어 있음, `http` URL만, `reviews/...` key, 본문이 비어 예외. 교체 1건의 MinIO 객체 | 미측정 | 수정 API에 이미지 제거 분기가 없다 | 미판정 |
@@ -112,3 +112,45 @@ SYS 비밀번호 `measure_oracle`는 컨테이너 기동용이다.
 | 잠금 뒤 확인 | 10 | 10 | 0 | 10,000 | 10,000 | 1행 |
 
 재측정이 끝난 뒤 user 1은 시드 상태로 되돌렸다. 잔액 10,000, EARN 10,000 1행이다.
+
+## v0.3.0 추천 SQL
+
+`RecommendSqlMeasureTest`가 사용자 1의 바우만 축 D/S/P/W로 `RecommendationsMapper`의 두 SELECT를 따로 호출했다. `RecommendationsService`와 `ImageService`는 호출하지 않았다. 시간과 실행 계획은 같은 SQL을 JDBC `PreparedStatement`로 실행했다. 워밍업 2회 뒤 10회다. 평균과 최댓값만 적는다. 인덱스는 추가하지 않았다.
+
+정답 픽스처는 상품 20, 리뷰 40이다. 성능 스키마는 사용자 20, 상품 200, 리뷰 2,000이다.
+
+### 대표 케이스
+
+상품 쿼리 원문에는 `ROW_NUMBER`가 없다. 리뷰 쿼리 원문에는 `PARTITION BY p.product_id`인 `ROW_NUMBER`가 있다.
+
+| 케이스 | 쿼리 | 이번 실행 |
+| --- | --- | --- |
+| 4축 일치 | 상품 | 상품 1, 점수 120, 16행 안에 있음 |
+| 2축 일치 | 상품 | 상품 2, 점수 60. `total_score >= 40`은 넘지만 `FETCH FIRST 16` 밖 |
+| 리뷰 수 가중 | 상품 | 상품 4, `review_count` 40, 점수 140, 1위 |
+| 4축 불일치 | 상품 | 상품 16, 점수 0, 16행 밖 |
+| 삭제 상품 | 상품 | `deleted_at` 조건이 없다. 상품 3, 18, 20은 점수 120, `review_count` 0으로 같다. 이번 16행에는 3과 18이 들어갔고 20은 빠졌다 |
+| 한 상품에 리뷰 2개 | 리뷰 | 16행, 상품 ID 중복 0건. 상품 1은 리뷰 2만 남음 |
+| `is_checked = 1`의 1.2배 | 리뷰 | 리뷰 1 기본 점수 70, `is_checked` 0. 리뷰 2 기본 점수 60, `is_checked` 1, 1.2배 후 72. 대표는 리뷰 2 |
+| 2축 리뷰 | 리뷰 | 상품 2의 리뷰 3이 이번 16행의 마지막, 점수 60. 상품 5의 리뷰 11·12도 점수 60, 좋아요 0이다. `ORDER BY`는 둘 중 누구를 16번째로 둘지 정하지 않는다 |
+
+상품 쿼리가 이번 실행에서 반환한 상품 ID는 4, 1, 5, 19, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 3, 18이다. 같은 점수와 같은 `review_count` 사이의 순서는 고정되어 있지 않다.
+
+### 시간
+
+단위는 ms다. 10회 표본의 평균과 최댓값이다.
+
+| 쿼리 | 데이터 | 반환 행 | 평균 | 최댓값 |
+| --- | --- | --- | --- | --- |
+| `findRecommendProducts` | 정답 픽스처 | 16 | 2.710 | 3.244 |
+| `findRecommendReviews` | 정답 픽스처 | 16 | 6.956 | 8.622 |
+| `findRecommendProducts` | 성능 스키마, 리뷰 2,000 | 16 | 2.357 | 2.807 |
+| `findRecommendReviews` | 성능 스키마, 리뷰 2,000 | 16 | 11.481 | 13.299 |
+
+성능 스키마의 `EXPLAIN PLAN`은 쿼리당 1회다. 상품 쿼리 plan hash `1000561082`는 `BAUMANN`, `PRODUCT`, `PRODUCT_IMAGE`를 `TABLE ACCESS FULL`로 읽는다. 계획에 보이는 `ROW_NUMBER`는 `FETCH FIRST 16`을 정렬 제한으로 바꾼 것이고 `PARTITION BY product_id`가 아니다. 리뷰 쿼리 plan hash `120112575`는 `REVIEW` 2,000행을 포함한 조인 테이블을 풀 스캔하고, `PARTITION BY product_id` 창 정렬에 임시 공간 3,208KB를 적었다. 옵티마이저 `Time` 열은 측정 시간이 아니다.
+
+### `e7c2fa82`
+
+그 커밋의 `findRecommencementsWithAll`을 현재 `MEASURE` 스키마에서 실행했다. 컬럼은 맞았다. 10회 모두 19행, 평균 3.630ms, 최댓값 4.381ms다. `ORDER BY`에 `DBMS_RANDOM.VALUE`가 있어 순서는 비교하지 않았다. 10회를 합친 상품 ID는 19개고, 현재 상품 쿼리의 16개 ID는 그 안에 모두 있다. 과거에만 있는 ID는 2, 17, 20이다. 상품 16은 양쪽 다 없다.
+
+같은 픽스처의 현재 상품 쿼리는 16행, 평균 2.710ms다. 점수식과 행 제한이 다르므로 개선율로 계산하지 않았다. 그 커밋의 나머지 네 개 축별 SELECT는 실행하지 않았다. 리뷰 추천 SQL은 그 커밋에 없다. `9b4be372`는 비교하지 않았다.
