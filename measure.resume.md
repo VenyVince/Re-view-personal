@@ -187,6 +187,8 @@ v0.5.0에서 이 측정을 실행했다. 숫자는 `measure.md`의 v0.5.0이다.
 
 CSRF와 `testcode` 브랜치 대조는 하지 않는다. 이번 근거는 `main`의 위 다섯 요청이다.
 
+v0.8.0에서 이 다섯 요청을 실행했다. 숫자는 `measure.md`의 v0.8.0이다. 비로그인 GET `/api/products`는 200이다. `ROLE_USER`의 GET `/api/admin/reviews`는 403 JSON이다. 비로그인 POST `/api/qna`도 401이 아니라 같은 403 JSON이고 컨트롤러는 호출되지 않았다. matcher 밖 GET `/api/not-in-matchers`는 500이다. 빈 로그인 본문은 400 `Validation Failed`다. 전체 보호율은 계산하지 않는다.
+
 ### C1. MinIO
 
 파일 1개로 경로만 확인한다.
@@ -331,7 +333,7 @@ Phase 1은 아래를 구현하지 않는다. 측정이 실패하거나 코드에
 
 - 추천·검색 SQL 튜닝과 인덱스 추가.
 - 헤더 검색 서비스가 브랜드를 매퍼의 `filter_category` 자리에 넘긴다. XML의 브랜드 조건은 `filter_brand`다.
-- `anyRequest().permitAll()` 변경, matcher 밖 경로 차단, CSRF 보강.
+- `anyRequest().permitAll()` 변경, matcher 밖 경로 차단, CSRF 보강. 비로그인 POST `/api/qna`는 컨트롤러에 들어가지 않고 403 `접근 권한이 부족합니다.`다. matcher 밖 GET `/api/not-in-matchers`는 500 `Other Exception!`이다.
 - 베스트 포인트 이력의 중복 방지 유니크 제약. 확인을 락 뒤로 옮기는 변경은 v0.2.0 재측정에서 했다.
 - `getCurrentUserRole()`을 락 밖으로 옮기는 변경.
 - 이미지 제거 API, MinIO 원본 삭제, object key와 기존 이미지 id를 나누는 DTO.

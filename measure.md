@@ -2,7 +2,7 @@
 
 계획의 기준 커밋은 `c95dd83d`다. 이 작업 트리의 HEAD는 `c84fbc3a`다. `src`, `infra`, `View`, 루트 `Dockerfile`은 `c95dd83d`와 같다. `.github/workflows/deploy.yml`은 빈 줄만 다르다. 단계, `self-hosted`, Secrets, `compose down`, `build --no-cache`, `up -d`는 같다.
 
-반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색, v0.5.0 주문·포인트, v0.6.0 이미지·MinIO, v0.7.0 스케줄러다.
+반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색, v0.5.0 주문·포인트, v0.6.0 이미지·MinIO, v0.7.0 스케줄러, v0.8.0 보안이다.
 
 ## E0 결과 표
 
@@ -21,7 +21,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | C1 MinIO | `src/main/java/com/review/shop/image/ImageService.java`. `src/main/java/com/review/shop/image/minio/MinioConfig.java`. `ImageUploadController` | `c95dd83d` | 파일 1건. object key, PUT URL, DB의 key, GET URL, 코드의 만료 10분·5분, 객체 존재 | 아래 v0.6.0. 응답 키는 `objectKey`, `presignedUrl`. PUT 200, DB는 URL이 아닌 key, GET은 다른 URL. `X-Amz-Expires`는 PUT 600, GET 300. 객체 크기 13 | `main`의 MinIO 클라이언트는 `MINIO_URL` 하나다. 만료 시각까지 기다리지 않았다 | 미판정 |
 | C3 스케줄러 | `src/main/java/org/spring/project/re_view/ReViewApplication.java`의 `@EnableScheduling`. `src/main/java/com/review/shop/util/ReviewScheduler.java`. `ProductreviewMapper.xml`의 `selectBestReviewIds` | `c95dd83d` | cron `0 0 0 1 * *`, zone `Asia/Seoul`, 좋아요 20 초과, 상품 리뷰 수 30 초과, 상위 10%. 로그인 없이 `runUpdateBestReviewsNow()` 2회 | 아래 v0.7.0. 후보 리뷰는 4, 5, 6, 7. 두 번 모두 `로그인이 필요합니다`로 롤백. `is_checked`와 700원 EARN 0행, user 4 잔액 0은 그대로 | 운영 로그가 없어 정기 실행이라고 쓰지 않는다. 이번 2회는 이력 행이 생기기 전에 롤백되어 중복 방지까지 가지 않았다. 동시 중복은 v0.2.0을 인용한다 | 미판정 |
-| B3 Security | `src/main/java/com/review/shop/config/SecurityConfig.java` 112행 `anyRequest().permitAll()` | `c95dd83d` | 공개 GET 1개, 인증 POST 1개의 401, `/api/admin/**` 1개의 403, matcher 밖 1개, Validation 1개 | 미측정 | 전체 보호율은 계산하지 않는다 | 미판정 |
+| B3 Security | `src/main/java/com/review/shop/config/SecurityConfig.java` 112행 `anyRequest().permitAll()` | `c95dd83d` | 공개 GET `/api/products`, 비로그인 POST `/api/qna`, `ROLE_USER`의 GET `/api/admin/reviews`, matcher 밖 GET `/api/not-in-matchers`, 빈 로그인 JSON | 아래 v0.8.0. 200, 403, 403, 500, 400. 401은 이 다섯 요청에 없었다. matcher 밖은 보안을 통과한 뒤 500 | 전체 보호율은 계산하지 않는다. 403 JSON은 CSRF 거부와 권한 부족이 같은 문구다 | 미판정 |
 
 ## C2 Compose·Actions
 
@@ -289,3 +289,19 @@ diff의 WHERE 술어는 현재와 같다. 바뀐 것은 정렬 키 이름과 `lo
 두 호출 모두 예외 사슬은 `DatabaseException: Best 리뷰 포인트 적립 중 DB 오류가 발생했습니다.` ← `DatabaseException: 포인트 처리 중 DB 오류가 발생했습니다.` ← `WrongRequestException: 로그인이 필요합니다.`였다.
 
 예외 뒤 리뷰 2의 `is_checked`는 1, 리뷰 4부터 10은 0으로 호출 전과 같았다. user 4의 700원 EARN은 0행, 잔액은 0이었다. 1회차에서 이력 행이 생기기 전에 트랜잭션이 롤백되어, 2회차가 중복 방지를 지나가는지는 보지 못했다. 같은 사용자·같은 리뷰의 동시 10스레드는 v0.2.0에서 잠금 뒤 확인으로 1행이었다. 그 결과를 이번 2회 실행의 중복 방지로 다시 세지 않는다.
+
+## v0.8.0 보안
+
+`SecurityMeasureTest`가 MockMvc로 요청 다섯 개를 보냈다. 전체 경로를 세지 않았고 보호율은 계산하지 않았다. CSRF와 `testcode` 브랜치 대조는 하지 않았다. 제품 코드는 바꾸지 않았다.
+
+`SecurityConfig`는 form login과 HTTP Basic을 끄고, CSRF는 `/api/auth/login`만 제외한다. 인증 실패 진입점은 401 `로그인이 필요합니다`를 쓰고, 권한 거부는 403 `접근 권한이 부족합니다.`를 쓴다. 둘 다 `ErrorResponseDTO`의 `status`, `code`, `message`, `path`, `timestamp`다. 마지막 규칙은 112행 `anyRequest().permitAll()`이다.
+
+| 요청 | 조건 | 상태 | 본문 |
+| --- | --- | --- | --- |
+| GET `/api/products` | 비로그인. GET 공개 matcher | 200 | JSON 배열. `ProductController`가 호출됨 |
+| POST `/api/qna` | 비로그인. 본문 `{}`. CSRF 토큰 없음. POST `/api/qna`는 authenticated | 403 | `Access Denied`, `접근 권한이 부족합니다.`, path `/api/qna`. 컨트롤러는 호출되지 않음 |
+| GET `/api/admin/reviews` | 이름 `measure_user`, 권한 `ROLE_USER`. `/api/admin/**`는 `hasRole("ADMIN")` | 403 | 같은 403 JSON. path `/api/admin/reviews`. 컨트롤러는 호출되지 않음 |
+| GET `/api/not-in-matchers` | 위 matcher에 없는 경로 | 500 | `Other Exception!`, `No static resource api/not-in-matchers.` 보안 401·403이 아님 |
+| POST `/api/auth/login` | 본문 `{}`. 이 경로는 permitAll이고 CSRF 제외 | 400 | `Validation Failed`. `id: 아이디를 입력해주세요.`와 `password: 비밀번호를 입력해주세요.` |
+
+인증 진입점의 401은 이 다섯 요청에 없었다. 비로그인 POST는 컨트롤러 앞에서 403 JSON으로 끝났다. 그 문구는 일반 사용자의 관리자 GET과 같다. matcher 밖 경로는 `permitAll`을 지나 `NoResourceFoundException`이 되었고, 전역 `Exception` 핸들러가 500으로 바꿨다. 검증 실패도 같은 다섯 필드의 JSON이다. 필드 문구의 순서는 고정하지 않는다.
