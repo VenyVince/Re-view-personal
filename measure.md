@@ -2,7 +2,7 @@
 
 계획의 기준 커밋은 `c95dd83d`다. 이 작업 트리의 HEAD는 `c84fbc3a`다. `src`, `infra`, `View`, 루트 `Dockerfile`은 `c95dd83d`와 같다. `.github/workflows/deploy.yml`은 빈 줄만 다르다. 단계, `self-hosted`, Secrets, `compose down`, `build --no-cache`, `up -d`는 같다.
 
-반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색, v0.5.0 주문·포인트, v0.6.0 이미지·MinIO다.
+반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색, v0.5.0 주문·포인트, v0.6.0 이미지·MinIO, v0.7.0 스케줄러다.
 
 ## E0 결과 표
 
@@ -20,7 +20,7 @@
 | 항목 | 파일 경로 | 커밋 해시 | 조건 | 결과 | 한계 | 반영 판정 |
 | --- | --- | --- | --- | --- | --- | --- |
 | C1 MinIO | `src/main/java/com/review/shop/image/ImageService.java`. `src/main/java/com/review/shop/image/minio/MinioConfig.java`. `ImageUploadController` | `c95dd83d` | 파일 1건. object key, PUT URL, DB의 key, GET URL, 코드의 만료 10분·5분, 객체 존재 | 아래 v0.6.0. 응답 키는 `objectKey`, `presignedUrl`. PUT 200, DB는 URL이 아닌 key, GET은 다른 URL. `X-Amz-Expires`는 PUT 600, GET 300. 객체 크기 13 | `main`의 MinIO 클라이언트는 `MINIO_URL` 하나다. 만료 시각까지 기다리지 않았다 | 미판정 |
-| C3 스케줄러 | `src/main/java/org/spring/project/re_view/ReViewApplication.java`의 `@EnableScheduling`. `src/main/java/com/review/shop/util/ReviewScheduler.java`. `ProductreviewMapper.xml`의 `selectBestReviewIds` | `c95dd83d` | cron `0 0 0 1 * *`, zone `Asia/Seoul`, 좋아요 20 초과, 상품 리뷰 수 30 초과, 상위 10%. `runUpdateBestReviewsNow()` 2회 | 미측정 | 운영 로그가 없으면 정기 실행이라고 쓰지 않는다. 동시 중복은 A1 결과를 인용한다 | 미판정 |
+| C3 스케줄러 | `src/main/java/org/spring/project/re_view/ReViewApplication.java`의 `@EnableScheduling`. `src/main/java/com/review/shop/util/ReviewScheduler.java`. `ProductreviewMapper.xml`의 `selectBestReviewIds` | `c95dd83d` | cron `0 0 0 1 * *`, zone `Asia/Seoul`, 좋아요 20 초과, 상품 리뷰 수 30 초과, 상위 10%. 로그인 없이 `runUpdateBestReviewsNow()` 2회 | 아래 v0.7.0. 후보 리뷰는 4, 5, 6, 7. 두 번 모두 `로그인이 필요합니다`로 롤백. `is_checked`와 700원 EARN 0행, user 4 잔액 0은 그대로 | 운영 로그가 없어 정기 실행이라고 쓰지 않는다. 이번 2회는 이력 행이 생기기 전에 롤백되어 중복 방지까지 가지 않았다. 동시 중복은 v0.2.0을 인용한다 | 미판정 |
 | B3 Security | `src/main/java/com/review/shop/config/SecurityConfig.java` 112행 `anyRequest().permitAll()` | `c95dd83d` | 공개 GET 1개, 인증 POST 1개의 401, `/api/admin/**` 1개의 403, matcher 밖 1개, Validation 1개 | 미측정 | 전체 보호율은 계산하지 않는다 | 미판정 |
 
 ## C2 Compose·Actions
@@ -257,3 +257,35 @@ diff의 WHERE 술어는 현재와 같다. 바뀐 것은 정렬 키 이름과 `lo
 | 객체 | `statObject` 크기 13 |
 
 클라이언트는 `MinioConfig`의 `minio.url` 하나다. 측정 프로파일 값은 `http://127.0.0.1:9000`이다. 만료 시각이 지날 때까지 기다리지 않았고, CPU·메모리 감소율은 계산하지 않았다.
+
+## v0.7.0 스케줄러
+
+`SchedulerMeasureTest`가 어노테이션과 선정 쿼리를 읽고, `SecurityContext`를 비운 뒤 `ReviewScheduler.runUpdateBestReviewsNow()`를 두 번 호출했다. 매달 1일을 기다리지 않았고 운영 로그는 보지 않았다. 제품 코드는 바꾸지 않았다.
+
+`ReViewApplication`에 `@EnableScheduling`이 있다. `updateBestReviewMonthly`의 cron은 `0 0 0 1 * *`, zone은 `Asia/Seoul`이다. 이 메서드와 `runUpdateBestReviewsNow`는 둘 다 `ProductReviewService.updateBestReviews`를 호출한다. `GET /api/admin/run`도 같은 메서드를 호출하지만, 이번 측정은 HTTP로 그 경로를 치지 않았다.
+
+### 선정 조건
+
+`selectBestReviewIds`는 `like_count > 20`이고 `product.review_count > 30`인 리뷰를 상품별로 줄 세운다. 정렬은 좋아요 내림차순, 싫어요 오름차순, 댓글 수 내림차순이다. 남기는 수는 `review_number <= FLOOR(review_count * 0.1)`이다. 10%의 기준은 리뷰 행 수가 아니라 상품 컬럼 `review_count`다. SQL에 `deleted_at` 조건은 없다.
+
+상품 4 `스케줄세럼`의 컬럼 `review_count`는 40이고 리뷰 행은 7개다. `FLOOR(40 * 0.1)`은 4다.
+
+| 리뷰 | 좋아요 | 결과 |
+| --- | --- | --- |
+| 4 | 30 | 후보. user 4 |
+| 5 | 28 | 후보. user 4 |
+| 6 | 26 | 후보. user 4 |
+| 7 | 24 | 후보. user 4 |
+| 8 | 22 | 5번째라 탈락 |
+| 9 | 10 | `like_count > 20`에서 탈락 |
+| 10 | 5 | `like_count > 20`에서 탈락 |
+
+쿼리 결과는 리뷰 4, 5, 6, 7이고 작성자는 user 4 한 명이다. 좋아요가 서로 달라 댓글 수 정렬은 순위를 바꾸지 않았다. 상품 4에 삭제된 리뷰 행은 없다.
+
+### 로컬 2회
+
+`updateBestReviews`는 `@Transactional`이다. 기존 `is_checked`를 0으로 지우고, 후보에 1을 찍은 뒤 `addBestReviewPoint`로 700원을 넣는다. 포인트 갱신은 `getCurrentUserRole()`을 호출하고, 인증이 없으면 `WrongRequestException: 로그인이 필요합니다`를 던진다. 스케줄 메서드는 `SecurityContext`를 채우지 않는다.
+
+두 호출 모두 예외 사슬은 `DatabaseException: Best 리뷰 포인트 적립 중 DB 오류가 발생했습니다.` ← `DatabaseException: 포인트 처리 중 DB 오류가 발생했습니다.` ← `WrongRequestException: 로그인이 필요합니다.`였다.
+
+예외 뒤 리뷰 2의 `is_checked`는 1, 리뷰 4부터 10은 0으로 호출 전과 같았다. user 4의 700원 EARN은 0행, 잔액은 0이었다. 1회차에서 이력 행이 생기기 전에 트랜잭션이 롤백되어, 2회차가 중복 방지를 지나가는지는 보지 못했다. 같은 사용자·같은 리뷰의 동시 10스레드는 v0.2.0에서 잠금 뒤 확인으로 1행이었다. 그 결과를 이번 2회 실행의 중복 방지로 다시 세지 않는다.

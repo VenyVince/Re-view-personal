@@ -209,6 +209,8 @@ v0.6.0에서 이 경로를 파일 1건으로 실행했다. 발급 응답은 `obj
 
 설정은 `@EnableScheduling`, cron, zone, 선정 SQL의 20·30·10%를 코드와 대조한다. 정답 픽스처에 조건을 만족하는 리뷰와 만족하지 않는 리뷰를 넣고 `runUpdateBestReviewsNow()`를 두 번 호출한다. 1회차의 선정과 700원 이력 수, 2회차에 이력이 늘어나는지를 적는다. 동시 중복은 A1 결과를 인용한다. 운영 로그가 없으면 정기 실행되었다고 쓰지 않는다.
 
+v0.7.0에서 이 측정을 실행했다. 숫자는 `measure.md`의 v0.7.0이다. cron은 `0 0 0 1 * *`, zone은 `Asia/Seoul`이다. 상품 4는 컬럼 `review_count` 40, 리뷰 행 7개이고 후보는 리뷰 4, 5, 6, 7이다. 로그인 없이 두 번 호출하면 둘 다 `로그인이 필요합니다`로 롤백되고, `is_checked`와 700원 이력과 user 4 잔액은 그대로였다. 운영에서 매달 실행되었다고 쓰지 않는다.
+
 ## 5. Estimated Time by Task
 
 이 코드를 아는 사람 기준의 집중 작업이다. 환경, 테스트 작성과 실행, 기록, 최종 판정이 들어 있다.
@@ -334,6 +336,7 @@ Phase 1은 아래를 구현하지 않는다. 측정이 실패하거나 코드에
 - `getCurrentUserRole()`을 락 밖으로 옮기는 변경.
 - 이미지 제거 API, MinIO 원본 삭제, object key와 기존 이미지 id를 나누는 DTO.
 - `updateReview` 유지 경로는 `selectReviewById`가 `REVIEW_IMAGES`를 읽지 않아 응답 `images`가 빈 목록이다. DB key는 유지된다.
+- 베스트 리뷰 스케줄러는 포인트 지급 안에서 로그인한 역할을 조회한다. 로그인 없는 `runUpdateBestReviewsNow` 두 번은 트랜잭션이 롤백되어 `is_checked`와 700원 이력이 바뀌지 않았다.
 - MinIO public/private 클라이언트 분리.
 - 테스트만을 위한 예외 주입 분기.
 
