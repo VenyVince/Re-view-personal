@@ -1,4 +1,4 @@
-# v0.1.0 측정 기록
+# 측정 기록
 
 계획의 기준 커밋은 `c95dd83d`다. 이 작업 트리의 HEAD는 `c84fbc3a`다. `src`, `infra`, `View`, 루트 `Dockerfile`은 `c95dd83d`와 같다. `.github/workflows/deploy.yml`은 빈 줄만 다르다. 단계, `self-hosted`, Secrets, `compose down`, `build --no-cache`, `up -d`는 같다.
 
@@ -10,7 +10,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | 바우만 4기준 일치, 리뷰 수·별점 가중치, 부분 일치, `ROW_NUMBER`로 상품당 대표 리뷰 1개, MyBatis SQL | `src/main/resources/mapper/recommendations/RecommendationsMapper.xml`의 `findRecommendProducts`, `findRecommendReviews`. `src/main/java/com/review/shop/service/recommendations/RecommendationsService.java` | 현재 코드 `c95dd83d`. 추천 SQL 이력 `e7c2fa82`, `9b4be372`, `54d9aa3b` | 정답 픽스처의 4축 일치, 2축 일치, 상품당 리뷰 2개, `is_checked = 1`의 1.2배. 리뷰 2,000건에서 워밍업 2회 뒤 10회. `EXPLAIN PLAN` 1회 | 미측정 | 상품 쿼리에는 `ROW_NUMBER`가 없다. 과거 SQL 비교는 `e7c2fa82`를 30분 안에 실행할 때만 | 미판정 |
 | 주문 상품에 연결해 실제 구매자만 리뷰를 작성. 주문 시점의 상품명·가격 저장. 포인트 잔액과 분리된 이력 | `ProductReviewService.canCreate`. `src/main/resources/mapper/order/OrderItemIdMapper.xml`. `OrdersMapper.xml`의 `ORDER_ITEM.PRODUCT_NAME`, `PRODUCT_PRICE`. `src/main/resources/mapper/userinfo/other/point/PointMapper.xml` | 현재 코드 `c95dd83d` | 주문상품 없음, 타인 `order_item_id`, 이미 리뷰가 있는 `order_item_id`, 본인 주문상품 각 1건. 주문 후 상품명·가격 변경. `usePoint` 1건. 재고 부족 예외 뒤 주문 행과 포인트 이력 | 미측정 | 거절 메시지는 하나로 묶인다. 단일 트랜잭션 문장은 이력서에 없다 | 미판정 |
-| 사용자 행을 잠그고 같은 트랜잭션에서 계산·갱신 | `src/main/resources/mapper/userinfo/other/point/PointMapper.xml`의 `selectForUpdate`. `src/main/java/com/review/shop/service/userinfo/other/PointService.java`의 `updateUserPoint`, `addReviewPoint`, `usePoint`, `addBestReviewPoint` | 락이 들어온 커밋 `1d954cca`. 현재 코드 `c95dd83d` | 사용자 1명, 시작 잔액 10,000, 적립 100과 차감 100을 섞어 20개 동시, 5번 반복. 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드 1회 | 미측정 | `updateUserPoint`는 잠금 안에서 `Security_Util.getCurrentUserRole()`을 본다. `addBestReviewPoint`는 `checkBestReviewPoint`가 `selectForUpdate`보다 앞이다. `point_history`에 중복 방지 유니크 제약이 없다 | 미판정 |
+| 사용자 행을 잠그고 같은 트랜잭션에서 계산·갱신 | `src/main/resources/mapper/userinfo/other/point/PointMapper.xml`의 `selectForUpdate`. `src/main/java/com/review/shop/service/userinfo/other/PointService.java`의 `updateUserPoint`, `addReviewPoint`, `usePoint`, `addBestReviewPoint` | 락이 들어온 커밋 `1d954cca`. 확인 순서 변경은 이번 측정에서 `PointService`에 반영 | 사용자 1명, 시작 잔액 10,000, 적립 100과 차감 100을 섞어 20개 동시, 5번 반복. 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드 1회 | 일반 잔액·이력 불일치 0건. 수정 전 베스트 700원 EARN 9행. 잠금 뒤 확인으로 바꾼 재측정은 1행. 아래 v0.2.0 | `getCurrentUserRole()`은 잠금을 잡은 뒤 로그인 아이디로 `USER_TABLE.role`을 다시 조회한다. `point_history`에는 중복 방지 유니크 제약이 없다 | 미판정 |
 | 리뷰 수정 시 `http` URL은 무시하고, 새 object key가 있을 때만 교체 | `src/main/java/com/review/shop/service/review/ProductReviewService.java`의 `filterObjectKeys`, `updateReview` | 필터 커밋 `63521f66`. 현재 코드 `c95dd83d` | `images`가 비어 있음, `http` URL만, `reviews/...` key, 본문이 비어 예외. 교체 1건의 MinIO 객체 | 미측정 | 수정 API에 이미지 제거 분기가 없다 | 미판정 |
 | `Client → Nginx → Spring Boot → Oracle / MinIO`를 EC2 Compose로 운영. GitHub Actions self-hosted runner와 Secrets. 이미지에 `.env` 없음 | `infra/docker-compose.yml`. `View/nginx/default.conf`. `View/Dockerfile`. `.github/workflows/deploy.yml`. 루트 `Dockerfile` | 현재 코드 `c95dd83d`. workflow 파일은 `c84fbc3a`에서 빈 줄만 다름 | 서비스 4개, `/api` 프록시, `self-hosted`, Secrets, 루트 Dockerfile의 `.env` COPY 유무. Actions는 최근 실행의 상태와 run id. EC2 재배포 없음 | 아래 C2. 최근 실행은 `cancelled`, run id `25278122824` | 운영 배포 성공률은 이 파일 대조로 말하지 않는다 | 미판정 |
 | 소개 문장의 검색·추천·이미지·포인트·배포 | 검색 `src/main/java/com/review/shop/service/search/HeaderSearchService.java`, `src/main/resources/mapper/search/header/HeaderSearchProductMapper.xml`, `HeaderSearchReviewMapper.xml`. 추천·이미지·포인트·배포는 위 행의 경로 | 현재 코드 `c95dd83d` | 상품명 키워드, 브랜드 필터, 삭제 상품 제외, 기본 정렬, 정렬 하나. 리뷰 검색 키워드 1건과 10회 시간 | 미측정 | 포트폴리오의 “2글자 이상”은 이 표의 조건에 넣지 않았다. A3에서 `HeaderSearchService`를 다시 본다 | 미판정 |
@@ -85,3 +85,30 @@ SYS 비밀번호 `measure_oracle`는 컨테이너 기동용이다.
 `measure-oracle`는 `gvenzl/oracle-xe:latest`로 떠 있다. 같은 이미지의 `review-db`도 호스트 1521에서 떠 있고, `infra/docker-compose.yml`의 `oracle-db` 이미지와 같다. `review-minio`는 Exited다. BE·FE 이미지는 이번에 빌드하지 않았다.
 
 프로파일 `measure`로 `MeasureConnectionTest` 2건이 통과했다. 정답 스키마는 사용자 5, 상품 20, 리뷰 40, 주문상품 4, user 1 잔액 10,000이다. 성능 스키마는 사용자 20, 상품 200, 리뷰 2,000이다.
+
+## v0.2.0 포인트 동시성
+
+`PointConcurrencyMeasureTest`가 스프링의 `PointService`를 호출했다. 스레드마다 로그인 아이디 `measure_user`의 `SecurityContext`를 넣었다. `getCurrentUserRole()`은 권한 객체가 아니라 그 아이디로 DB의 role을 읽고, 이 조회는 `selectForUpdate` 다음에 있다. 첫 측정에서는 락 순서를 바꾸지 않았다. `8856d129`는 부팅하지 않았다.
+
+일반 잔액은 user 1, 시작 10,000, 적립 100 열 건과 차감 100 열 건을 동시에 실행하고 그 묶음을 5번 반복했다. 회차마다 잔액과 이력을 시작 상태로 되돌린 뒤 측정했다. 기댓값은 시작 잔액 + 성공 적립 − 성공 차감이다.
+
+| 회차 | 성공 적립 | 성공 차감 | 예외 | 기댓값 | `USER_TABLE.point` | EARN 합 − USE 합 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 10 | 10 | 0 | 10,000 | 10,000 | 10,000 |
+| 2 | 10 | 10 | 0 | 10,000 | 10,000 | 10,000 |
+| 3 | 10 | 10 | 0 | 10,000 | 10,000 | 10,000 |
+| 4 | 10 | 10 | 0 | 10,000 | 10,000 | 10,000 |
+| 5 | 10 | 10 | 0 | 10,000 | 10,000 | 10,000 |
+
+잔액과 이력의 불일치 건수는 0이다.
+
+베스트 지급은 같은 user 1, review 2에 `addBestReviewPoint` 10스레드를 한 번 호출했다. 예외는 0이고, 700원 EARN 행은 9행이다. 1행이 아니므로 실패다. 당시에는 `checkBestReviewPoint`가 `selectForUpdate`보다 앞이었다.
+
+이 결과를 보고 `addBestReviewPoint`에서 사용자 행 `selectForUpdate`를 중복 확인보다 앞으로 옮겼다. `point_history` 유니크 제약은 추가하지 않았다. 같은 테스트로 다시 측정했다. 일반 잔액 5회는 다시 불일치 0건이었다. 베스트 10스레드는 예외 0, 700원 EARN 1행이었다.
+
+| 구분 | 성공 적립 | 성공 차감 | 예외 | 잔액 | 이력 합 | 베스트 700원 EARN |
+| --- | --- | --- | --- | --- | --- | --- |
+| 수정 전 | 10 | 10 | 0 | 10,000 | 10,000 | 9행 |
+| 잠금 뒤 확인 | 10 | 10 | 0 | 10,000 | 10,000 | 1행 |
+
+재측정이 끝난 뒤 user 1은 시드 상태로 되돌렸다. 잔액 10,000, EARN 10,000 1행이다.

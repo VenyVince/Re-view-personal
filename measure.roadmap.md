@@ -7,7 +7,7 @@
 | 버전 | 범위 | 완료시 결과 | 완료여부 | 일정 |
 | --- | --- | --- | --- | --- |
 | v0.1.0 | E0 결과 표, E1 Oracle·측정 프로파일·시드, C2 Compose·Actions 설정 대조 | 문장마다 파일 경로가 적힌 결과 표. 측정 프로파일로 Oracle 접속. 정답 픽스처와 리뷰 2,000건. 서비스 구성, workflow 단계, 이미지에 `.env` 없음 | [x] | |
-| v0.2.0 | A1 포인트 동시성 | 동시 적립·차감 뒤 잔액과 이력의 불일치 건수. 베스트 지급의 이력 행 수 | [ ] | |
+| v0.2.0 | A1 포인트 동시성 | 동시 적립·차감 뒤 잔액과 이력의 불일치 건수. 베스트 지급의 이력 행 수 | [x] | |
 | v0.3.0 | A2 추천 SQL | 두 쿼리의 대표 케이스 통과·실패, 데이터 건수, 10회 시간, 실행 계획. 과거 SQL은 바로 실행될 때만 | [ ] | |
 | v0.4.0 | A3 검색 | 대표 조건의 통과·실패와 현재 SQL 시간. 과거 SQL은 바로 비교될 때만 | [ ] | |
 | v0.5.0 | B2 주문·포인트 정합성 | 구매자 제한, 주문 스냅샷, 포인트 이력, 롤백의 통과·실패와 실제 트랜잭션 범위 | [ ] | |
@@ -26,7 +26,7 @@
 
 현재 구현 범위:
 
-- 포인트 락은 `1d954cca`의 `PointMapper.xml` `FOR UPDATE`다. `updateUserPoint`는 잠금 안에서 `Security_Util.getCurrentUserRole()`을 본다. `addBestReviewPoint`는 `checkBestReviewPoint`가 `selectForUpdate`보다 앞이고, 이 매퍼의 `point_history`에는 중복 방지 유니크 제약이 없다.
+- 포인트 락은 `1d954cca`의 `PointMapper.xml` `FOR UPDATE`다. `updateUserPoint`는 잠금 안에서 `Security_Util.getCurrentUserRole()`을 본다. `addBestReviewPoint`는 v0.2.0 재측정에서 `selectForUpdate` 뒤에 `checkBestReviewPoint`를 호출한다. 이 매퍼의 `point_history`에는 중복 방지 유니크 제약이 없다.
 - `findRecommendProducts`는 4축과 `review_count` 구간 점수이며 `ROW_NUMBER`가 없다. `findRecommendReviews`는 4축, 별점 유사도, `is_checked` 1.2배, 상품별 `ROW_NUMBER`다.
 - 상품 검색은 `LIKE '%' || keyword || '%'`다. 포트폴리오의 “2글자 이상”은 `HeaderSearchService`에서 바로 보이지 않는다.
 - `updateReview`는 필터 결과가 비면 기존 key를 유지한다. 이미지 제거 분기는 없다. 필터는 `63521f66`이다.
@@ -78,7 +78,7 @@
 - 기댓값은 시작 잔액 + 성공 적립 − 성공 차감이다. `USER_TABLE.point`와 `point_history`의 EARN 합 − USE 합을 둘 다 비교한다.
 - 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드를 한 번 호출하고, 700원 EARN 행 수를 센다. 1행이 아니면 실패로 적는다.
 - 락이 `1d954cca`에 들어왔다는 것은 git 근거로 적는다. `8856d129`는 다시 부팅하지 않는다.
-- 락 순서는 고치지 않는다.
+- 첫 측정에서 베스트 700원 EARN이 9행이었다. 재측정 전에 `addBestReviewPoint`의 사용자 행 잠금을 중복 확인보다 앞으로 옮겼다. 유니크 제약은 추가하지 않는다.
 
 완료 기준
 
@@ -214,7 +214,7 @@ Phase 1 완료에는 필요 없다. `mature.resume.md` 7절과 8절에 있는 �
 - 배포 시간과 부하 절감. Actions 성공률과 배포 소요 시간, MinIO 전후의 CPU·메모리, EC2에서 compose를 다시 올려 API 기동을 확인. self-hosted runner가 떠 있고 성공한 workflow가 쌓인 뒤, 배포 시간을 이력서에 넣을지 정할 때 다시 본다.
 - 추천·검색 SQL 튜닝과 인덱스 추가.
 - `anyRequest().permitAll()` 변경, matcher 밖 경로 차단, CSRF 보강.
-- 베스트 포인트의 확인 순서를 락 뒤로 바꾸거나 유니크 제약을 추가.
+- 베스트 포인트 이력의 중복 방지 유니크 제약. 확인을 락 뒤로 옮기는 변경은 v0.2.0 재측정에서 했다.
 - `getCurrentUserRole()`을 락 밖으로 옮기는 변경.
 - 이미지 제거 API, MinIO 원본 삭제, object key와 기존 이미지 id를 나누는 DTO.
 - MinIO public/private 클라이언트 분리.

@@ -48,7 +48,7 @@ Phase 1은 다음 네 가지만 한다.
 - `findRecommendProducts`는 4축과 `review_count` 구간 점수다. `ROW_NUMBER`가 없다. `findRecommendReviews`는 4축, 별점 유사도, `is_checked` 1.2배, 상품별 `ROW_NUMBER`다. 이력서의 한 문장이 두 쿼리를 담고 있다.
 - `updateUserPoint`는 `FOR UPDATE` 뒤 `Security_Util.getCurrentUserRole()`로 DB를 다시 본다. 보안 컨텍스트 없이 호출하면 락 검증 전에 예외가 난다. 이 조회는 락 구간에 포함된다. Phase 1에서 위치를 옮기지 않는다.
 - 같은 클래스 내부 호출은 `@Transactional` 프록시를 타지 않는다. 테스트 진입점은 `addReviewPoint`, `usePoint`, `addBestReviewPoint`, `processOrder`처럼 공개 메서드다.
-- `addBestReviewPoint`는 `checkBestReviewPoint`가 `selectForUpdate`보다 앞이다. 이 매퍼의 `point_history`에는 중복 방지 유니크 제약이 없다.
+- `addBestReviewPoint`는 v0.2.0 재측정에서 `selectForUpdate` 뒤에 `checkBestReviewPoint`를 호출한다. 이 매퍼의 `point_history`에는 중복 방지 유니크 제약이 없다.
 - `updateReview`에는 이미지 제거 분기가 없다. 필터 결과가 비면 기존 key를 유지한다.
 - `SecurityConfig` 112행은 `anyRequest().permitAll()`이다.
 - `OrderService.processOrder`는 `@Transactional` 안에서 `pointService.usePoint`, `checkAndDeductStock`, `saveOrderToDatabase`를 호출한다. `usePoint`는 다른 빈이라 기본 전파로 합류한다. 재고 차감과 주문 저장은 같은 클래스 내부 호출이라 바깥 트랜잭션에서 실행된다. `ORDER_ITEM`은 `PRODUCT_NAME`, `PRODUCT_PRICE`를 저장한다. `DatabaseException`은 `RuntimeException`이다.
@@ -118,7 +118,7 @@ Phase 1은 다음 네 가지만 한다.
 
 일반 잔액은 사용자 1명, 시작 10,000, 적립 100과 차감 100을 섞어 20개를 동시에 실행한다. 이 묶음을 5번 반복한다. 기댓값은 시작 잔액 + 성공 적립 − 성공 차감이다. `USER_TABLE.point`와 `point_history`의 EARN 합 − USE 합을 둘 다 비교한다. 잔액만 맞으면 이력 insert가 트랜잭션 밖에 있어도 통과하므로 둘을 본다. 요청 단계 10·30·50이나 10회 반복은 유실이 있는지 확인하는 데 필요하지 않다. 한 동시성과 5회 반복에서 불일치가 0인지 아닌지만 이력서 문장에 필요하다.
 
-베스트 지급은 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드를 한 번 호출하고, 700원 EARN 행 수를 센다. 1행이 아니면 그 수를 실패로 적는다. 일반 잔액이 맞아도 베스트 경로가 안전하다고 쓰지 않는다. 락 순서는 Phase 1에서 고치지 않는다.
+베스트 지급은 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드를 한 번 호출하고, 700원 EARN 행 수를 센다. 1행이 아니면 그 수를 실패로 적는다. 첫 측정은 확인이 락보다 앞이라 9행이었다. 사용자 행 잠금을 확인보다 앞으로 옮긴 뒤 같은 호출을 다시 재고, 그 행 수를 남긴다. 유니크 제약은 이 단계에서 추가하지 않는다.
 
 `8856d129`를 다시 부팅하지 않는다. 락이 `1d954cca`에 들어왔다는 것은 git 근거로 적고, 실행 근거는 현재 코드의 불일치 건수다.
 
@@ -319,7 +319,7 @@ Phase 1은 아래를 구현하지 않는다. 측정이 실패하거나 코드에
 
 - 추천·검색 SQL 튜닝과 인덱스 추가.
 - `anyRequest().permitAll()` 변경, matcher 밖 경로 차단, CSRF 보강.
-- 베스트 포인트의 확인 순서를 락 뒤로 바꾸거나 유니크 제약을 추가.
+- 베스트 포인트 이력의 중복 방지 유니크 제약. 확인을 락 뒤로 옮기는 변경은 v0.2.0 재측정에서 했다.
 - `getCurrentUserRole()`을 락 밖으로 옮기는 변경.
 - 이미지 제거 API, MinIO 원본 삭제, object key와 기존 이미지 id를 나누는 DTO.
 - MinIO public/private 클라이언트 분리.

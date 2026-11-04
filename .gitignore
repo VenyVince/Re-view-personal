@@ -29,6 +29,7 @@ Thumbs.db
 
 # Optional local docs / agent notes
 Codex/
+/LocalDoc/
 
 ### STS ###
 .apt_generated

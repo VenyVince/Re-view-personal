@@ -135,7 +135,7 @@ public class PointService {
     @Transactional
     public void addBestReviewPoint(int user_id, int review_id) {
         try {
-            // 중복 지급 여부
+            pointMapper.selectForUpdate(user_id);
             boolean paid = pointMapper.checkBestReviewPoint(user_id, review_id, PointConstants.BestREVIEW, "EARN");
             if (paid) return;
 

@@ -172,7 +172,7 @@ FE 파일명 요청
 
 베스트 선정 SQL: 좋아요 20 초과 · 상품 리뷰 30 초과, 상품별 좋아요→싫어요→댓글 상위 **10%**. 매월 1일 0시(`Asia/Seoul`). 스케줄러 클래스는 팀 기간에 존재, **`@EnableScheduling` 누락으로 미실행 → 2026.05에 활성화.**
 
-남은 이슈: 베스트 포인트 중복 체크가 lock보다 앞. 다음 작업은 락 이후 체크.
+베스트 포인트는 사용자 행을 `SELECT … FOR UPDATE`한 뒤에 같은 리뷰의 700원 지급 이력을 확인한다.
 
 #### 회원 · 쇼핑 API
 
@@ -229,8 +229,8 @@ Compose로 Oracle·MinIO·BE·FE 일괄 기동. Actions self-hosted runner가 Se
 ## 한계
 
 - `anyRequest().permitAll()`, `/minio/test` 잔존
-- 베스트 포인트 중복 체크가 lock보다 앞
+- 베스트 포인트 이력에는 같은 지급을 한 번만 허용하는 유니크 제약이 없다
 - Presigned URL 구분이 `startsWith("http")`
 - main 테스트는 `contextLoads()` 수준
 
-다음 작업: deny-by-default, 중복 체크를 lock 뒤로, 이미지 요청 DTO 분리, 보안 테스트 main 병합, 단위 테스트.
+다음 작업: deny-by-default, 이미지 요청 DTO 분리, 보안 테스트 main 병합, 단위 테스트.
