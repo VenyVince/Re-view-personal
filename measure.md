@@ -2,14 +2,14 @@
 
 계획의 기준 커밋은 `c95dd83d`다. 이 작업 트리의 HEAD는 `c84fbc3a`다. `src`, `infra`, `View`, 루트 `Dockerfile`은 `c95dd83d`와 같다. `.github/workflows/deploy.yml`은 빈 줄만 다르다. 단계, `self-hosted`, Secrets, `compose down`, `build --no-cache`, `up -d`는 같다.
 
-반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색이다.
+반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색, v0.5.0 주문·포인트다.
 
 ## E0 결과 표
 
 | 이력서 문장 | 파일 경로 | 커밋 해시 | 조건 | 결과 | 한계 | 반영 판정 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 바우만 4기준 일치, 리뷰 수·별점 가중치, 부분 일치, `ROW_NUMBER`로 상품당 대표 리뷰 1개, MyBatis SQL | `src/main/resources/mapper/recommendations/RecommendationsMapper.xml`의 `findRecommendProducts`, `findRecommendReviews`. `src/main/java/com/review/shop/service/recommendations/RecommendationsService.java` | 현재 코드 `c95dd83d`. 추천 SQL 이력 `e7c2fa82`, `9b4be372`, `54d9aa3b` | 정답 픽스처의 4축 일치, 2축 일치, 상품당 리뷰 2개, `is_checked = 1`의 1.2배. 리뷰 2,000건에서 워밍업 2회 뒤 10회. `EXPLAIN PLAN` 1회 | 아래 v0.3.0. 리뷰 16행, 상품 ID 중복 0건. 상품 1의 대표는 리뷰 2, 점수 72. 상품 쿼리 16행에 상품 1(120) 포함, 상품 2(60) 제외. 리뷰 2,000건에서 상품 쿼리 평균 2.357ms 최댓값 2.807ms, 리뷰 쿼리 평균 11.481ms 최댓값 13.299ms | 상품 쿼리 원문에는 `ROW_NUMBER`가 없다. 실행 계획의 `ROW_NUMBER`는 `FETCH FIRST 16`이다. `deleted_at` 조건은 없다. `e7c2fa82`에는 리뷰 추천 SQL이 없다. 개선율은 계산하지 않았다 | 미판정 |
-| 주문 상품에 연결해 실제 구매자만 리뷰를 작성. 주문 시점의 상품명·가격 저장. 포인트 잔액과 분리된 이력 | `ProductReviewService.canCreate`. `src/main/resources/mapper/order/OrderItemIdMapper.xml`. `OrdersMapper.xml`의 `ORDER_ITEM.PRODUCT_NAME`, `PRODUCT_PRICE`. `src/main/resources/mapper/userinfo/other/point/PointMapper.xml` | 현재 코드 `c95dd83d` | 주문상품 없음, 타인 `order_item_id`, 이미 리뷰가 있는 `order_item_id`, 본인 주문상품 각 1건. 주문 후 상품명·가격 변경. `usePoint` 1건. 재고 부족 예외 뒤 주문 행과 포인트 이력 | 미측정 | 거절 메시지는 하나로 묶인다. 단일 트랜잭션 문장은 이력서에 없다 | 미판정 |
+| 주문 상품에 연결해 실제 구매자만 리뷰를 작성. 주문 시점의 상품명·가격 저장. 포인트 잔액과 분리된 이력 | `ProductReviewService.canCreate`. `src/main/resources/mapper/order/OrderItemIdMapper.xml`. `OrdersMapper.xml`의 `ORDER_ITEM.PRODUCT_NAME`, `PRODUCT_PRICE`. `src/main/resources/mapper/userinfo/other/point/PointMapper.xml` | 현재 코드 `c95dd83d` | 주문상품 없음, 타인 `order_item_id`, 이미 리뷰가 있는 `order_item_id`, 본인 주문상품 각 1건. 주문 후 상품명·가격 변경. `usePoint` 1건. 재고 부족 예외 뒤 주문 행과 포인트 이력 | 아래 v0.5.0. 거절 3건은 모두 `canCreate` false와 `잘못된 접근입니다.` 본인 미작성 주문상품 1은 true. 상품명을 바꾼 뒤 기존 주문상품은 `측정토너` 12,000, 그 뒤 만든 주문상품은 `변경토너` 999. `usePoint` 100은 잔액 9,900, USE 1행. 재고 0 상품 주문은 예외 뒤 주문 수와 잔액이 그대로 | 거절 이유는 메시지로 구분되지 않는다. 확인한 롤백은 `processOrder` 한 번의 재고 예외다. 단일 트랜잭션 문장은 이력서에 없다 | 미판정 |
 | 사용자 행을 잠그고 같은 트랜잭션에서 계산·갱신 | `src/main/resources/mapper/userinfo/other/point/PointMapper.xml`의 `selectForUpdate`. `src/main/java/com/review/shop/service/userinfo/other/PointService.java`의 `updateUserPoint`, `addReviewPoint`, `usePoint`, `addBestReviewPoint` | 락이 들어온 커밋 `1d954cca`. 확인 순서 변경은 이번 측정에서 `PointService`에 반영 | 사용자 1명, 시작 잔액 10,000, 적립 100과 차감 100을 섞어 20개 동시, 5번 반복. 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드 1회 | 일반 잔액·이력 불일치 0건. 수정 전 베스트 700원 EARN 9행. 잠금 뒤 확인으로 바꾼 재측정은 1행. 아래 v0.2.0 | `getCurrentUserRole()`은 잠금을 잡은 뒤 로그인 아이디로 `USER_TABLE.role`을 다시 조회한다. `point_history`에는 중복 방지 유니크 제약이 없다 | 미판정 |
 | 리뷰 수정 시 `http` URL은 무시하고, 새 object key가 있을 때만 교체 | `src/main/java/com/review/shop/service/review/ProductReviewService.java`의 `filterObjectKeys`, `updateReview` | 필터 커밋 `63521f66`. 현재 코드 `c95dd83d` | `images`가 비어 있음, `http` URL만, `reviews/...` key, 본문이 비어 예외. 교체 1건의 MinIO 객체 | 미측정 | 수정 API에 이미지 제거 분기가 없다 | 미판정 |
 | `Client → Nginx → Spring Boot → Oracle / MinIO`를 EC2 Compose로 운영. GitHub Actions self-hosted runner와 Secrets. 이미지에 `.env` 없음 | `infra/docker-compose.yml`. `View/nginx/default.conf`. `View/Dockerfile`. `.github/workflows/deploy.yml`. 루트 `Dockerfile` | 현재 코드 `c95dd83d`. workflow 파일은 `c84fbc3a`에서 빈 줄만 다름 | 서비스 4개, `/api` 프록시, `self-hosted`, Secrets, 루트 Dockerfile의 `.env` COPY 유무. Actions는 최근 실행의 상태와 run id. EC2 재배포 없음 | 아래 C2. 최근 실행은 `cancelled`, run id `25278122824` | 운영 배포 성공률은 이 파일 대조로 말하지 않는다 | 미판정 |
@@ -193,3 +193,32 @@ SYS 비밀번호 `measure_oracle`는 컨테이너 기동용이다.
 ### `2c4f24ab`
 
 diff의 WHERE 술어는 현재와 같다. 바뀐 것은 정렬 키 이름과 `low_price`, `high_price`, `reviews`, `popular` 분기다. 과거 SQL은 실행하지 않았고 개선율은 계산하지 않았다.
+
+## v0.5.0 주문·포인트
+
+`OrderPointMeasureTest`가 `ProductReviewService`, `PointService.usePoint`, `OrderService.processOrder`를 호출했다. 로그인 아이디는 `measure_user`다. 측정이 끝난 뒤 user 1은 잔액 10,000과 EARN 10,000 한 줄로 되돌렸고, 이번 호출로 생긴 주문은 지웠다. 상품 1은 이름 `측정토너`, 가격 12,000, 재고 20으로 되돌렸다.
+
+### 구매자 제한
+
+`canCreate`는 두 조건을 따로 본다. `existsOrderItem`은 그 `order_item_id`의 주문자와 user id가 같은지 세고, `checkReviewByOrderItemId`는 그 주문상품에 `deleted_at`이 없는 리뷰가 있는지 센다. 둘 중 하나라도 통과하지 못하면 false다. `createReviewWithReward`는 그 false를 모두 `잘못된 접근입니다.`로 던진다.
+
+| 경우 | DB 조건 | `canCreate` | 예외 메시지 |
+| --- | --- | --- | --- |
+| user 3, 주문상품 1 | 주문자가 user 1 | false | 잘못된 접근입니다. |
+| user 1, 주문상품 3 | 주문자가 user 2 | false | 잘못된 접근입니다. |
+| user 1, 주문상품 2 | 리뷰 1이 연결됨 | false | 잘못된 접근입니다. |
+| user 1, 주문상품 1 | 본인 주문이고 리뷰 없음 | true | 호출하지 않음 |
+
+### 주문 스냅샷
+
+주문상품 1은 `측정토너`, 12,000이었다. 상품 1을 `변경토너`, 999로 바꾼 뒤에도 주문상품 1은 그대로였다. 그 상태에서 상품 1을 1개, `using_point` 0으로 `processOrder`했다. 새 주문상품은 `변경토너`, 999였다. 상품명을 `두번째변경`으로 다시 바꿔도 그 주문상품은 `변경토너`, 999였다. 주문 수는 4에서 5가 됐다.
+
+### 포인트 1건
+
+`usePoint(1, 100)` 앞의 잔액은 10,000, USE 100원 행은 0이었다. 뒤에는 잔액 9,900, USE 100원 행 1이었다. 설명은 `물품 구매로 인한 차감`이다.
+
+### 재고 부족
+
+상품 18의 재고는 0이다. `processOrder`는 `usePoint`를 먼저 호출하고, 이어서 같은 클래스의 `checkAndDeductStock`을 호출한다. `deductStock`은 `stock >= quantity`일 때만 재고를 줄인다. 수량이 1이면 반영 행이 0이고 `WrongRequestException: 재고가 부족합니다. 상품ID: 18`이 난다. `processOrder`에 `@Transactional`이 있고 `usePoint`는 다른 빈의 기본 전파라 그 트랜잭션에 들어온다. 예외 뒤 주문 수는 5 그대로, 잔액은 9,900 그대로, USE 50원 행은 0 그대로였다. 이 한 번의 호출에서 포인트 차감과 주문 저장이 같이 롤백된 것은 확인했다. 다른 진입점까지 한 트랜잭션이라고 쓰지 않는다.
+
+`checkAndDeductStock`과 `saveOrderToDatabase`에는 `@Transactional`이 없다. 재고 차감과 주문 저장은 `processOrder` 안의 같은 클래스 호출이다.
