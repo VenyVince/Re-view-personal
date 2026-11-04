@@ -9,7 +9,7 @@
 | v0.1.0 | E0 결과 표, E1 Oracle·측정 프로파일·시드, C2 Compose·Actions 설정 대조 | 문장마다 파일 경로가 적힌 결과 표. 측정 프로파일로 Oracle 접속. 정답 픽스처와 리뷰 2,000건. 서비스 구성, workflow 단계, 이미지에 `.env` 없음 | [x] | |
 | v0.2.0 | A1 포인트 동시성 | 동시 적립·차감 뒤 잔액과 이력의 불일치 건수. 베스트 지급의 이력 행 수 | [x] | |
 | v0.3.0 | A2 추천 SQL | 두 쿼리의 대표 케이스 통과·실패, 데이터 건수, 10회 시간, 실행 계획. 과거 SQL은 바로 실행될 때만 | [x] | |
-| v0.4.0 | A3 검색 | 대표 조건의 통과·실패와 현재 SQL 시간. 과거 SQL은 바로 비교될 때만 | [ ] | |
+| v0.4.0 | A3 검색 | 대표 조건의 통과·실패와 현재 SQL 시간. 과거 SQL은 바로 비교될 때만 | [x] | |
 | v0.5.0 | B2 주문·포인트 정합성 | 구매자 제한, 주문 스냅샷, 포인트 이력, 롤백의 통과·실패와 실제 트랜잭션 범위 | [ ] | |
 | v0.6.0 | B1 이미지 보존, C1 MinIO 1건 | 미변경·URL·교체·실패의 통과·실패. 제거 API가 없으면 그 기록. 업로드 주체, DB에 남는 값, 객체 존재, 코드의 만료 시간 | [ ] | |
 | v0.7.0 | C3 스케줄러 | cron·zone·선정 조건과 로컬 2회 실행 결과. 운영 로그가 없으면 운영 실행이라고 쓰지 않음 | [ ] | |
@@ -22,13 +22,13 @@
 
 ## 현재 구현 범위와 수정 범위
 
-정량 측정은 포인트 동시성, 추천 SQL, 검색만 한다. 이미지, 주문 정합성, 보안, MinIO, 배포, 스케줄러는 시나리오 통과나 설정 확인으로 끝낸다. 아래는 측정 대상인 현재 구현이다. 포인트 동시성과 추천 SQL의 결과는 `measure.md`에 있다. 검색부터는 아직 없다.
+정량 측정은 포인트 동시성, 추천 SQL, 검색만 한다. 이미지, 주문 정합성, 보안, MinIO, 배포, 스케줄러는 시나리오 통과나 설정 확인으로 끝낸다. 아래는 측정 대상인 현재 구현이다. 포인트 동시성, 추천 SQL, 헤더 검색의 결과는 `measure.md`에 있다. 주문·포인트 정합성부터는 아직 없다.
 
 현재 구현 범위:
 
 - 포인트 락은 `1d954cca`의 `PointMapper.xml` `FOR UPDATE`다. `updateUserPoint`는 잠금 안에서 `Security_Util.getCurrentUserRole()`을 본다. `addBestReviewPoint`는 v0.2.0 재측정에서 `selectForUpdate` 뒤에 `checkBestReviewPoint`를 호출한다. 이 매퍼의 `point_history`에는 중복 방지 유니크 제약이 없다.
 - `findRecommendProducts`는 4축과 `review_count` 구간 점수이며 `ROW_NUMBER`가 없다. `findRecommendReviews`는 4축, 별점 유사도, `is_checked` 1.2배, 상품별 `ROW_NUMBER`다.
-- 상품 검색은 `LIKE '%' || keyword || '%'`다. 포트폴리오의 “2글자 이상”은 `HeaderSearchService`에서 바로 보이지 않는다.
+- 상품 검색은 `LIKE '%' || keyword || '%'`다. 2글자 제한은 `HeaderSearchController`에 있고 `HeaderSearchService`와 SQL에는 없다. 서비스는 브랜드를 매퍼의 `filter_category` 자리에 넘긴다.
 - `updateReview`는 필터 결과가 비면 기존 key를 유지한다. 이미지 제거 분기는 없다. 필터는 `63521f66`이다.
 - `canCreate`는 그 사용자의 `order_item_id`이고 리뷰가 없을 때만 통과한다. `ORDER_ITEM`은 `PRODUCT_NAME`, `PRODUCT_PRICE`를 저장한다. `processOrder`의 `@Transactional` 안에서 `usePoint`는 다른 빈이라 기본 전파로 합류하고, 재고 차감과 주문 저장은 같은 클래스 내부 호출이다.
 - `SecurityConfig` 112행은 `anyRequest().permitAll()`이다.
@@ -213,6 +213,7 @@ Phase 1 완료에는 필요 없다. `mature.resume.md` 7절과 8절에 있는 �
 - CSRF와 `testcode` 브랜치. 토큰 없는 POST 1건, `testcode` 브랜치와 `main`의 보안 테스트 대조. Phase 2에서 `permitAll`을 바꾸고 보안 테스트를 `main`에 넣을 때 다시 본다.
 - 배포 시간과 부하 절감. Actions 성공률과 배포 소요 시간, MinIO 전후의 CPU·메모리, EC2에서 compose를 다시 올려 API 기동을 확인. self-hosted runner가 떠 있고 성공한 workflow가 쌓인 뒤, 배포 시간을 이력서에 넣을지 정할 때 다시 본다.
 - 추천·검색 SQL 튜닝과 인덱스 추가.
+- 헤더 검색 서비스가 브랜드를 매퍼의 `filter_category` 자리에 넘긴다. XML의 브랜드 조건은 `filter_brand`다.
 - `anyRequest().permitAll()` 변경, matcher 밖 경로 차단, CSRF 보강.
 - 베스트 포인트 이력의 중복 방지 유니크 제약. 확인을 락 뒤로 옮기는 변경은 v0.2.0 재측정에서 했다.
 - `getCurrentUserRole()`을 락 밖으로 옮기는 변경.

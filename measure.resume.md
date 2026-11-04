@@ -147,6 +147,8 @@ v0.3.0에서 이 측정을 실행했다. 숫자는 `measure.md`의 v0.3.0이다.
 
 `2c4f24ab` 전후 diff는 30분이다. 술어가 같고 정렬만 다르면 개선율을 계산하지 않는다.
 
+v0.4.0에서 이 측정을 실행했다. 숫자는 `measure.md`의 v0.4.0이다. 상품명 `측정토너`는 상품 1만 반환하고 삭제 상품 3은 빠졌다. `filter_brand`에 `MeasureBrand`를 주면 상품 1만 남는다. 기본 정렬과 `latest`는 상품 1, 2 순이고 `low_price`는 상품 2, 1 순이다. 리뷰 키워드 `리뷰검색어`는 리뷰 3이다. `2c4f24ab`는 술어가 같아 과거 SQL을 실행하지 않았다. 서비스는 브랜드를 `filter_category` 자리에 넘긴다.
+
 ### B1. 이미지
 
 `updateReview` 호출 전후로 `REVIEW_IMAGES`를 읽는다.
@@ -320,6 +322,7 @@ E1이 끝나기 전에는 DB 측정을 시작하지 않는다. C2는 Oracle 첫 
 Phase 1은 아래를 구현하지 않는다. 측정이 실패하거나 코드에서 확인되면 R의 Phase 2 목록에 현상만 추가한다.
 
 - 추천·검색 SQL 튜닝과 인덱스 추가.
+- 헤더 검색 서비스가 브랜드를 매퍼의 `filter_category` 자리에 넘긴다. XML의 브랜드 조건은 `filter_brand`다.
 - `anyRequest().permitAll()` 변경, matcher 밖 경로 차단, CSRF 보강.
 - 베스트 포인트 이력의 중복 방지 유니크 제약. 확인을 락 뒤로 옮기는 변경은 v0.2.0 재측정에서 했다.
 - `getCurrentUserRole()`을 락 밖으로 옮기는 변경.

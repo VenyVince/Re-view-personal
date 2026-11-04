@@ -2,7 +2,7 @@
 
 계획의 기준 커밋은 `c95dd83d`다. 이 작업 트리의 HEAD는 `c84fbc3a`다. `src`, `infra`, `View`, 루트 `Dockerfile`은 `c95dd83d`와 같다. `.github/workflows/deploy.yml`은 빈 줄만 다르다. 단계, `self-hosted`, Secrets, `compose down`, `build --no-cache`, `up -d`는 같다.
 
-반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL이다.
+반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색이다.
 
 ## E0 결과 표
 
@@ -13,7 +13,7 @@
 | 사용자 행을 잠그고 같은 트랜잭션에서 계산·갱신 | `src/main/resources/mapper/userinfo/other/point/PointMapper.xml`의 `selectForUpdate`. `src/main/java/com/review/shop/service/userinfo/other/PointService.java`의 `updateUserPoint`, `addReviewPoint`, `usePoint`, `addBestReviewPoint` | 락이 들어온 커밋 `1d954cca`. 확인 순서 변경은 이번 측정에서 `PointService`에 반영 | 사용자 1명, 시작 잔액 10,000, 적립 100과 차감 100을 섞어 20개 동시, 5번 반복. 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드 1회 | 일반 잔액·이력 불일치 0건. 수정 전 베스트 700원 EARN 9행. 잠금 뒤 확인으로 바꾼 재측정은 1행. 아래 v0.2.0 | `getCurrentUserRole()`은 잠금을 잡은 뒤 로그인 아이디로 `USER_TABLE.role`을 다시 조회한다. `point_history`에는 중복 방지 유니크 제약이 없다 | 미판정 |
 | 리뷰 수정 시 `http` URL은 무시하고, 새 object key가 있을 때만 교체 | `src/main/java/com/review/shop/service/review/ProductReviewService.java`의 `filterObjectKeys`, `updateReview` | 필터 커밋 `63521f66`. 현재 코드 `c95dd83d` | `images`가 비어 있음, `http` URL만, `reviews/...` key, 본문이 비어 예외. 교체 1건의 MinIO 객체 | 미측정 | 수정 API에 이미지 제거 분기가 없다 | 미판정 |
 | `Client → Nginx → Spring Boot → Oracle / MinIO`를 EC2 Compose로 운영. GitHub Actions self-hosted runner와 Secrets. 이미지에 `.env` 없음 | `infra/docker-compose.yml`. `View/nginx/default.conf`. `View/Dockerfile`. `.github/workflows/deploy.yml`. 루트 `Dockerfile` | 현재 코드 `c95dd83d`. workflow 파일은 `c84fbc3a`에서 빈 줄만 다름 | 서비스 4개, `/api` 프록시, `self-hosted`, Secrets, 루트 Dockerfile의 `.env` COPY 유무. Actions는 최근 실행의 상태와 run id. EC2 재배포 없음 | 아래 C2. 최근 실행은 `cancelled`, run id `25278122824` | 운영 배포 성공률은 이 파일 대조로 말하지 않는다 | 미판정 |
-| 소개 문장의 검색·추천·이미지·포인트·배포 | 검색 `src/main/java/com/review/shop/service/search/HeaderSearchService.java`, `src/main/resources/mapper/search/header/HeaderSearchProductMapper.xml`, `HeaderSearchReviewMapper.xml`. 추천·이미지·포인트·배포는 위 행의 경로 | 현재 코드 `c95dd83d` | 상품명 키워드, 브랜드 필터, 삭제 상품 제외, 기본 정렬, 정렬 하나. 리뷰 검색 키워드 1건과 10회 시간 | 미측정 | 포트폴리오의 “2글자 이상”은 이 표의 조건에 넣지 않았다. A3에서 `HeaderSearchService`를 다시 본다 | 미판정 |
+| 소개 문장의 검색·추천·이미지·포인트·배포 | 검색 `src/main/java/com/review/shop/service/search/HeaderSearchService.java`, `src/main/resources/mapper/search/header/HeaderSearchProductMapper.xml`, `HeaderSearchReviewMapper.xml`. 추천·이미지·포인트·배포는 위 행의 경로 | 현재 코드 `c95dd83d`. 정렬 키 변경 `2c4f24ab` | 상품명 키워드, 브랜드 필터, 삭제 상품 제외, 기본 정렬, 정렬 하나. 리뷰 검색 키워드 1건과 10회 시간 | 아래 v0.4.0. 키워드 `측정토너`는 상품 1, 삭제 상품 3은 제외. `filter_brand=MeasureBrand`는 상품 1. 기본 정렬과 `latest`는 1, 2 순. `low_price`는 2, 1 순. 리뷰 키워드 `리뷰검색어`는 리뷰 3. 리뷰 2,000건에서 상품 평균 6.396ms 최댓값 7.968ms, 리뷰 평균 15.181ms 최댓값 17.447ms | 2글자 제한은 `HeaderSearchController`에 있고 SQL에는 없다. 서비스는 브랜드를 `filter_category` 자리에 넘긴다. `2c4f24ab`는 술어가 같고 정렬만 달라 개선율을 계산하지 않았다 | 미판정 |
 
 측정 항목 중 이력서 문장 행에 결과가 나뉘어 들어가는 경로는 다음과 같다.
 
@@ -154,3 +154,42 @@ SYS 비밀번호 `measure_oracle`는 컨테이너 기동용이다.
 그 커밋의 `findRecommencementsWithAll`을 현재 `MEASURE` 스키마에서 실행했다. 컬럼은 맞았다. 10회 모두 19행, 평균 3.630ms, 최댓값 4.381ms다. `ORDER BY`에 `DBMS_RANDOM.VALUE`가 있어 순서는 비교하지 않았다. 10회를 합친 상품 ID는 19개고, 현재 상품 쿼리의 16개 ID는 그 안에 모두 있다. 과거에만 있는 ID는 2, 17, 20이다. 상품 16은 양쪽 다 없다.
 
 같은 픽스처의 현재 상품 쿼리는 16행, 평균 2.710ms다. 점수식과 행 제한이 다르므로 개선율로 계산하지 않았다. 그 커밋의 나머지 네 개 축별 SELECT는 실행하지 않았다. 리뷰 추천 SQL은 그 커밋에 없다. `9b4be372`는 비교하지 않았다.
+
+## v0.4.0 헤더 검색
+
+`HeaderSearchMeasureTest`가 `HeaderSearchProductMapper.searchProducts`와 `HeaderSearchReviewMapper.searchReviews`를 호출했다. `HeaderSearchService`와 `ImageService`는 호출하지 않았다. 시간과 실행 계획은 같은 SQL을 JDBC로 워밍업 2회 뒤 10회 실행한 값이다. 인덱스는 추가하지 않았다.
+
+매퍼 인자 순서는 `(keyword, sort, filter_category, filter_brand)`다. `HeaderSearchService`는 세 번째에 `filter_brand`, 네 번째에 `filter_category`를 넘긴다. 아래 브랜드 통과는 XML 이름에 맞춘 호출이다. 브랜드 문자열을 세 번째 자리에 넣은 호출은 비었다.
+
+### 대표 조건
+
+| 조건 | 호출 | 이번 실행 |
+| --- | --- | --- |
+| 상품명 키워드 | `측정토너`, 정렬 없음 | 상품 1. 이름에 같은 글자가 있는 삭제 상품 3은 없음 |
+| 삭제 상품 제외 | 위와 같음 | `deleted_at IS NULL`. 상품 3은 결과에 없음 |
+| 기본 정렬 | `측정`, 정렬 없음 | 상품 1, 2. `created_at DESC` |
+| `latest` | `측정`, `latest` | 상품 1, 2. 기본 정렬과 같은 순서 |
+| `low_price` | `측정`, `low_price` | 상품 2, 1. 가격 8,000이 12,000보다 앞 |
+| 브랜드 필터 | `측정`, `filter_brand=MeasureBrand` | 상품 1. 브랜드가 다른 상품 2는 없음 |
+| 서비스와 같은 인자 순서 | `측정`, 세 번째 인자 `MeasureBrand` | 빈 목록. 그 자리는 `filter_category` |
+| 한 글자 | `측` | 상품 1, 2. SQL에는 글자 수 조건이 없음 |
+| 리뷰 키워드 | `리뷰검색어` | 리뷰 3, 본문 `리뷰검색어 부분일치` |
+
+2글자 제한은 `HeaderSearchController` 46행 `keyword.length() < 2`다. `HeaderSearchService`와 두 매퍼 SQL에는 없다. 픽스처에 삭제된 리뷰 행은 없어서 리뷰의 `deleted_at` 제외는 행으로 확인하지 못했다. SQL 문장에는 `r.deleted_at IS NULL`이 있다.
+
+### 시간
+
+키워드 `성능`은 성능 스키마의 상품 200건과 리뷰 2,000건에 모두 맞는다. 단위는 ms다.
+
+| 쿼리 | 데이터 | 반환 행 | 평균 | 최댓값 |
+| --- | --- | --- | --- | --- |
+| 상품 검색 | 정답 픽스처, 키워드 `측정` | 2 | 3.904 | 4.870 |
+| 리뷰 검색 | 정답 픽스처, 키워드 `리뷰검색어` | 1 | 3.880 | 5.229 |
+| 상품 검색 | 성능 스키마, 키워드 `성능` | 200 | 6.396 | 7.968 |
+| 리뷰 검색 | 성능 스키마, 키워드 `성능` | 2,000 | 15.181 | 17.447 |
+
+상품 계획 hash `563358819`는 `PRODUCT`, `BAUMANN`, `PRODUCT_IMAGE`를 `TABLE ACCESS FULL`로 읽는다. 리뷰 계획 hash `2630596270`은 `REVIEW`, `PRODUCT`, `USER_TABLE`, `BAUMANN`을 풀 스캔하고, 리뷰 이미지의 최소 id는 `REVIEW_IMAGES` 기본키 `INDEX UNIQUE SCAN`이다. 정렬에 임시 공간 2,296KB를 적었다. 옵티마이저 `Time` 열은 측정 시간이 아니다.
+
+### `2c4f24ab`
+
+diff의 WHERE 술어는 현재와 같다. 바뀐 것은 정렬 키 이름과 `low_price`, `high_price`, `reviews`, `popular` 분기다. 과거 SQL은 실행하지 않았고 개선율은 계산하지 않았다.
