@@ -2,26 +2,26 @@
 
 계획의 기준 커밋은 `c95dd83d`다. 이 작업 트리의 HEAD는 `c84fbc3a`다. `src`, `infra`, `View`, 루트 `Dockerfile`은 `c95dd83d`와 같다. `.github/workflows/deploy.yml`은 빈 줄만 다르다. 단계, `self-hosted`, Secrets, `compose down`, `build --no-cache`, `up -d`는 같다.
 
-반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색, v0.5.0 주문·포인트, v0.6.0 이미지·MinIO, v0.7.0 스케줄러, v0.8.0 보안이다.
+반영 판정은 v0.9.0에 채웠다. `docs/review_resume.md`는 수정하지 않았다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색, v0.5.0 주문·포인트, v0.6.0 이미지·MinIO, v0.7.0 스케줄러, v0.8.0 보안이다.
 
 ## E0 결과 표
 
 | 이력서 문장 | 파일 경로 | 커밋 해시 | 조건 | 결과 | 한계 | 반영 판정 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 바우만 4기준 일치, 리뷰 수·별점 가중치, 부분 일치, `ROW_NUMBER`로 상품당 대표 리뷰 1개, MyBatis SQL | `src/main/resources/mapper/recommendations/RecommendationsMapper.xml`의 `findRecommendProducts`, `findRecommendReviews`. `src/main/java/com/review/shop/service/recommendations/RecommendationsService.java` | 현재 코드 `c95dd83d`. 추천 SQL 이력 `e7c2fa82`, `9b4be372`, `54d9aa3b` | 정답 픽스처의 4축 일치, 2축 일치, 상품당 리뷰 2개, `is_checked = 1`의 1.2배. 리뷰 2,000건에서 워밍업 2회 뒤 10회. `EXPLAIN PLAN` 1회 | 아래 v0.3.0. 리뷰 16행, 상품 ID 중복 0건. 상품 1의 대표는 리뷰 2, 점수 72. 상품 쿼리 16행에 상품 1(120) 포함, 상품 2(60) 제외. 리뷰 2,000건에서 상품 쿼리 평균 2.357ms 최댓값 2.807ms, 리뷰 쿼리 평균 11.481ms 최댓값 13.299ms | 상품 쿼리 원문에는 `ROW_NUMBER`가 없다. 실행 계획의 `ROW_NUMBER`는 `FETCH FIRST 16`이다. `deleted_at` 조건은 없다. `e7c2fa82`에는 리뷰 추천 SQL이 없다. 개선율은 계산하지 않았다 | 미판정 |
-| 주문 상품에 연결해 실제 구매자만 리뷰를 작성. 주문 시점의 상품명·가격 저장. 포인트 잔액과 분리된 이력 | `ProductReviewService.canCreate`. `src/main/resources/mapper/order/OrderItemIdMapper.xml`. `OrdersMapper.xml`의 `ORDER_ITEM.PRODUCT_NAME`, `PRODUCT_PRICE`. `src/main/resources/mapper/userinfo/other/point/PointMapper.xml` | 현재 코드 `c95dd83d` | 주문상품 없음, 타인 `order_item_id`, 이미 리뷰가 있는 `order_item_id`, 본인 주문상품 각 1건. 주문 후 상품명·가격 변경. `usePoint` 1건. 재고 부족 예외 뒤 주문 행과 포인트 이력 | 아래 v0.5.0. 거절 3건은 모두 `canCreate` false와 `잘못된 접근입니다.` 본인 미작성 주문상품 1은 true. 상품명을 바꾼 뒤 기존 주문상품은 `측정토너` 12,000, 그 뒤 만든 주문상품은 `변경토너` 999. `usePoint` 100은 잔액 9,900, USE 1행. 재고 0 상품 주문은 예외 뒤 주문 수와 잔액이 그대로 | 거절 이유는 메시지로 구분되지 않는다. 확인한 롤백은 `processOrder` 한 번의 재고 예외다. 단일 트랜잭션 문장은 이력서에 없다 | 미판정 |
-| 사용자 행을 잠그고 같은 트랜잭션에서 계산·갱신 | `src/main/resources/mapper/userinfo/other/point/PointMapper.xml`의 `selectForUpdate`. `src/main/java/com/review/shop/service/userinfo/other/PointService.java`의 `updateUserPoint`, `addReviewPoint`, `usePoint`, `addBestReviewPoint` | 락이 들어온 커밋 `1d954cca`. 확인 순서 변경은 이번 측정에서 `PointService`에 반영 | 사용자 1명, 시작 잔액 10,000, 적립 100과 차감 100을 섞어 20개 동시, 5번 반복. 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드 1회 | 일반 잔액·이력 불일치 0건. 수정 전 베스트 700원 EARN 9행. 잠금 뒤 확인으로 바꾼 재측정은 1행. 아래 v0.2.0 | `getCurrentUserRole()`은 잠금을 잡은 뒤 로그인 아이디로 `USER_TABLE.role`을 다시 조회한다. `point_history`에는 중복 방지 유니크 제약이 없다 | 미판정 |
-| 리뷰 수정 시 `http` URL은 무시하고, 새 object key가 있을 때만 교체 | `src/main/java/com/review/shop/service/review/ProductReviewService.java`의 `filterObjectKeys`, `updateReview` | 필터 커밋 `63521f66`. 현재 코드 `c95dd83d` | 리뷰 1. `images`가 비어 있음, `http` URL만, `reviews/...` key, 본문이 비어 예외. 교체 1건의 MinIO 객체 | 아래 v0.6.0. 빈 목록과 `http` URL은 key `reviews/fixture/review-1.jpg` 유지. 본문 없음은 `리뷰 내용이 필수입니다`이고 key 유지. 새 key 1건은 그 key로 교체되고 객체 크기 13 | 수정 API에 이미지 제거가 없다. `selectReviewById`는 `REVIEW_IMAGES`를 읽지 않아 유지 경로의 응답 `images`는 빈 목록이다 | 미판정 |
-| `Client → Nginx → Spring Boot → Oracle / MinIO`를 EC2 Compose로 운영. GitHub Actions self-hosted runner와 Secrets. 이미지에 `.env` 없음 | `infra/docker-compose.yml`. `View/nginx/default.conf`. `View/Dockerfile`. `.github/workflows/deploy.yml`. 루트 `Dockerfile` | 현재 코드 `c95dd83d`. workflow 파일은 `c84fbc3a`에서 빈 줄만 다름 | 서비스 4개, `/api` 프록시, `self-hosted`, Secrets, 루트 Dockerfile의 `.env` COPY 유무. Actions는 최근 실행의 상태와 run id. EC2 재배포 없음 | 아래 C2. 최근 실행은 `cancelled`, run id `25278122824` | 운영 배포 성공률은 이 파일 대조로 말하지 않는다 | 미판정 |
-| 소개 문장의 검색·추천·이미지·포인트·배포 | 검색 `src/main/java/com/review/shop/service/search/HeaderSearchService.java`, `src/main/resources/mapper/search/header/HeaderSearchProductMapper.xml`, `HeaderSearchReviewMapper.xml`. 추천·이미지·포인트·배포는 위 행의 경로 | 현재 코드 `c95dd83d`. 정렬 키 변경 `2c4f24ab` | 상품명 키워드, 브랜드 필터, 삭제 상품 제외, 기본 정렬, 정렬 하나. 리뷰 검색 키워드 1건과 10회 시간 | 아래 v0.4.0. 키워드 `측정토너`는 상품 1, 삭제 상품 3은 제외. `filter_brand=MeasureBrand`는 상품 1. 기본 정렬과 `latest`는 1, 2 순. `low_price`는 2, 1 순. 리뷰 키워드 `리뷰검색어`는 리뷰 3. 리뷰 2,000건에서 상품 평균 6.396ms 최댓값 7.968ms, 리뷰 평균 15.181ms 최댓값 17.447ms | 2글자 제한은 `HeaderSearchController`에 있고 SQL에는 없다. 서비스는 브랜드를 `filter_category` 자리에 넘긴다. `2c4f24ab`는 술어가 같고 정렬만 달라 개선율을 계산하지 않았다 | 미판정 |
+| 바우만 4기준 일치, 리뷰 수·별점 가중치, 부분 일치, `ROW_NUMBER`로 상품당 대표 리뷰 1개, MyBatis SQL | `src/main/resources/mapper/recommendations/RecommendationsMapper.xml`의 `findRecommendProducts`, `findRecommendReviews`. `src/main/java/com/review/shop/service/recommendations/RecommendationsService.java` | 현재 코드 `c95dd83d`. 추천 SQL 이력 `e7c2fa82`, `9b4be372`, `54d9aa3b` | 정답 픽스처의 4축 일치, 2축 일치, 상품당 리뷰 2개, `is_checked = 1`의 1.2배. 리뷰 2,000건에서 워밍업 2회 뒤 10회. `EXPLAIN PLAN` 1회 | 아래 v0.3.0. 리뷰 16행, 상품 ID 중복 0건. 상품 1의 대표는 리뷰 2, 점수 72. 상품 쿼리 16행에 상품 1(120) 포함, 상품 2(60) 제외. 리뷰 2,000건에서 상품 쿼리 평균 2.357ms 최댓값 2.807ms, 리뷰 쿼리 평균 11.481ms 최댓값 13.299ms | 상품 쿼리 원문에는 `ROW_NUMBER`가 없다. 실행 계획의 `ROW_NUMBER`는 `FETCH FIRST 16`이다. `deleted_at` 조건은 없다. `e7c2fa82`에는 리뷰 추천 SQL이 없다. 개선율은 계산하지 않았다 | 수정 |
+| 주문 상품에 연결해 실제 구매자만 리뷰를 작성. 주문 시점의 상품명·가격 저장. 포인트 잔액과 분리된 이력 | `ProductReviewService.canCreate`. `src/main/resources/mapper/order/OrderItemIdMapper.xml`. `OrdersMapper.xml`의 `ORDER_ITEM.PRODUCT_NAME`, `PRODUCT_PRICE`. `src/main/resources/mapper/userinfo/other/point/PointMapper.xml` | 현재 코드 `c95dd83d` | 주문상품 없음, 타인 `order_item_id`, 이미 리뷰가 있는 `order_item_id`, 본인 주문상품 각 1건. 주문 후 상품명·가격 변경. `usePoint` 1건. 재고 부족 예외 뒤 주문 행과 포인트 이력 | 아래 v0.5.0. 거절 3건은 모두 `canCreate` false와 `잘못된 접근입니다.` 본인 미작성 주문상품 1은 true. 상품명을 바꾼 뒤 기존 주문상품은 `측정토너` 12,000, 그 뒤 만든 주문상품은 `변경토너` 999. `usePoint` 100은 잔액 9,900, USE 1행. 재고 0 상품 주문은 예외 뒤 주문 수와 잔액이 그대로 | 거절 이유는 메시지로 구분되지 않는다. 확인한 롤백은 `processOrder` 한 번의 재고 예외다. 단일 트랜잭션 문장은 이력서에 없다 | 추가하지 않음 |
+| 사용자 행을 잠그고 같은 트랜잭션에서 계산·갱신 | `src/main/resources/mapper/userinfo/other/point/PointMapper.xml`의 `selectForUpdate`. `src/main/java/com/review/shop/service/userinfo/other/PointService.java`의 `updateUserPoint`, `addReviewPoint`, `usePoint`, `addBestReviewPoint` | 락이 들어온 커밋 `1d954cca`. 확인 순서 변경은 이번 측정에서 `PointService`에 반영 | 사용자 1명, 시작 잔액 10,000, 적립 100과 차감 100을 섞어 20개 동시, 5번 반복. 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드 1회 | 일반 잔액·이력 불일치 0건. 수정 전 베스트 700원 EARN 9행. 잠금 뒤 확인으로 바꾼 재측정은 1행. 아래 v0.2.0 | `getCurrentUserRole()`은 잠금을 잡은 뒤 로그인 아이디로 `USER_TABLE.role`을 다시 조회한다. `point_history`에는 중복 방지 유니크 제약이 없다 | 수정 |
+| 리뷰 수정 시 `http` URL은 무시하고, 새 object key가 있을 때만 교체 | `src/main/java/com/review/shop/service/review/ProductReviewService.java`의 `filterObjectKeys`, `updateReview` | 필터 커밋 `63521f66`. 현재 코드 `c95dd83d` | 리뷰 1. `images`가 비어 있음, `http` URL만, `reviews/...` key, 본문이 비어 예외. 교체 1건의 MinIO 객체 | 아래 v0.6.0. 빈 목록과 `http` URL은 key `reviews/fixture/review-1.jpg` 유지. 본문 없음은 `리뷰 내용이 필수입니다`이고 key 유지. 새 key 1건은 그 key로 교체되고 객체 크기 13 | 수정 API에 이미지 제거가 없다. `selectReviewById`는 `REVIEW_IMAGES`를 읽지 않아 유지 경로의 응답 `images`는 빈 목록이다 | 수정 |
+| `Client → Nginx → Spring Boot → Oracle / MinIO`를 EC2 Compose로 운영. GitHub Actions self-hosted runner와 Secrets. 이미지에 `.env` 없음 | `infra/docker-compose.yml`. `View/nginx/default.conf`. `View/Dockerfile`. `.github/workflows/deploy.yml`. 루트 `Dockerfile` | 현재 코드 `c95dd83d`. workflow 파일은 `c84fbc3a`에서 빈 줄만 다름 | 서비스 4개, `/api` 프록시, `self-hosted`, Secrets, 루트 Dockerfile의 `.env` COPY 유무. Actions는 최근 실행의 상태와 run id. EC2 재배포 없음 | 아래 C2. 최근 실행은 `cancelled`, run id `25278122824` | 운영 배포 성공률은 이 파일 대조로 말하지 않는다 | 수정 |
+| 소개 문장의 검색·추천·이미지·포인트·배포 | 검색 `src/main/java/com/review/shop/service/search/HeaderSearchService.java`, `src/main/resources/mapper/search/header/HeaderSearchProductMapper.xml`, `HeaderSearchReviewMapper.xml`. 추천·이미지·포인트·배포는 위 행의 경로 | 현재 코드 `c95dd83d`. 정렬 키 변경 `2c4f24ab` | 상품명 키워드, 브랜드 필터, 삭제 상품 제외, 기본 정렬, 정렬 하나. 리뷰 검색 키워드 1건과 10회 시간 | 아래 v0.4.0. 키워드 `측정토너`는 상품 1, 삭제 상품 3은 제외. `filter_brand=MeasureBrand`는 상품 1. 기본 정렬과 `latest`는 1, 2 순. `low_price`는 2, 1 순. 리뷰 키워드 `리뷰검색어`는 리뷰 3. 리뷰 2,000건에서 상품 평균 6.396ms 최댓값 7.968ms, 리뷰 평균 15.181ms 최댓값 17.447ms | 2글자 제한은 `HeaderSearchController`에 있고 SQL에는 없다. 서비스는 브랜드를 `filter_category` 자리에 넘긴다. `2c4f24ab`는 술어가 같고 정렬만 달라 개선율을 계산하지 않았다 | 수정 |
 
 측정 항목 중 이력서 문장 행에 결과가 나뉘어 들어가는 경로는 다음과 같다.
 
 | 항목 | 파일 경로 | 커밋 해시 | 조건 | 결과 | 한계 | 반영 판정 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C1 MinIO | `src/main/java/com/review/shop/image/ImageService.java`. `src/main/java/com/review/shop/image/minio/MinioConfig.java`. `ImageUploadController` | `c95dd83d` | 파일 1건. object key, PUT URL, DB의 key, GET URL, 코드의 만료 10분·5분, 객체 존재 | 아래 v0.6.0. 응답 키는 `objectKey`, `presignedUrl`. PUT 200, DB는 URL이 아닌 key, GET은 다른 URL. `X-Amz-Expires`는 PUT 600, GET 300. 객체 크기 13 | `main`의 MinIO 클라이언트는 `MINIO_URL` 하나다. 만료 시각까지 기다리지 않았다 | 미판정 |
-| C3 스케줄러 | `src/main/java/org/spring/project/re_view/ReViewApplication.java`의 `@EnableScheduling`. `src/main/java/com/review/shop/util/ReviewScheduler.java`. `ProductreviewMapper.xml`의 `selectBestReviewIds` | `c95dd83d` | cron `0 0 0 1 * *`, zone `Asia/Seoul`, 좋아요 20 초과, 상품 리뷰 수 30 초과, 상위 10%. 로그인 없이 `runUpdateBestReviewsNow()` 2회 | 아래 v0.7.0. 후보 리뷰는 4, 5, 6, 7. 두 번 모두 `로그인이 필요합니다`로 롤백. `is_checked`와 700원 EARN 0행, user 4 잔액 0은 그대로 | 운영 로그가 없어 정기 실행이라고 쓰지 않는다. 이번 2회는 이력 행이 생기기 전에 롤백되어 중복 방지까지 가지 않았다. 동시 중복은 v0.2.0을 인용한다 | 미판정 |
-| B3 Security | `src/main/java/com/review/shop/config/SecurityConfig.java` 112행 `anyRequest().permitAll()` | `c95dd83d` | 공개 GET `/api/products`, 비로그인 POST `/api/qna`, `ROLE_USER`의 GET `/api/admin/reviews`, matcher 밖 GET `/api/not-in-matchers`, 빈 로그인 JSON | 아래 v0.8.0. 200, 403, 403, 500, 400. 401은 이 다섯 요청에 없었다. matcher 밖은 보안을 통과한 뒤 500 | 전체 보호율은 계산하지 않는다. 403 JSON은 CSRF 거부와 권한 부족이 같은 문구다 | 미판정 |
+| C1 MinIO | `src/main/java/com/review/shop/image/ImageService.java`. `src/main/java/com/review/shop/image/minio/MinioConfig.java`. `ImageUploadController` | `c95dd83d` | 파일 1건. object key, PUT URL, DB의 key, GET URL, 코드의 만료 10분·5분, 객체 존재 | 아래 v0.6.0. 응답 키는 `objectKey`, `presignedUrl`. PUT 200, DB는 URL이 아닌 key, GET은 다른 URL. `X-Amz-Expires`는 PUT 600, GET 300. 객체 크기 13 | `main`의 MinIO 클라이언트는 `MINIO_URL` 하나다. 만료 시각까지 기다리지 않았다 | 수정 |
+| C3 스케줄러 | `src/main/java/org/spring/project/re_view/ReViewApplication.java`의 `@EnableScheduling`. `src/main/java/com/review/shop/util/ReviewScheduler.java`. `ProductreviewMapper.xml`의 `selectBestReviewIds` | `c95dd83d` | cron `0 0 0 1 * *`, zone `Asia/Seoul`, 좋아요 20 초과, 상품 리뷰 수 30 초과, 상위 10%. 로그인 없이 `runUpdateBestReviewsNow()` 2회 | 아래 v0.7.0. 후보 리뷰는 4, 5, 6, 7. 두 번 모두 `로그인이 필요합니다`로 롤백. `is_checked`와 700원 EARN 0행, user 4 잔액 0은 그대로 | 운영 로그가 없어 정기 실행이라고 쓰지 않는다. 이번 2회는 이력 행이 생기기 전에 롤백되어 중복 방지까지 가지 않았다. 동시 중복은 v0.2.0을 인용한다 | 제외 |
+| B3 Security | `src/main/java/com/review/shop/config/SecurityConfig.java` 112행 `anyRequest().permitAll()` | `c95dd83d` | 공개 GET `/api/products`, 비로그인 POST `/api/qna`, `ROLE_USER`의 GET `/api/admin/reviews`, matcher 밖 GET `/api/not-in-matchers`, 빈 로그인 JSON | 아래 v0.8.0. 200, 403, 403, 500, 400. 401은 이 다섯 요청에 없었다. matcher 밖은 보안을 통과한 뒤 500 | 전체 보호율은 계산하지 않는다. 403 JSON은 CSRF 거부와 권한 부족이 같은 문구다 | 제외 |
 
 ## C2 Compose·Actions
 
@@ -305,3 +305,46 @@ diff의 WHERE 술어는 현재와 같다. 바뀐 것은 정렬 키 이름과 `lo
 | POST `/api/auth/login` | 본문 `{}`. 이 경로는 permitAll이고 CSRF 제외 | 400 | `Validation Failed`. `id: 아이디를 입력해주세요.`와 `password: 비밀번호를 입력해주세요.` |
 
 인증 진입점의 401은 이 다섯 요청에 없었다. 비로그인 POST는 컨트롤러 앞에서 403 JSON으로 끝났다. 그 문구는 일반 사용자의 관리자 GET과 같다. matcher 밖 경로는 `permitAll`을 지나 `NoResourceFoundException`이 되었고, 전역 `Exception` 핸들러가 500으로 바꿨다. 검증 실패도 같은 다섯 필드의 JSON이다. 필드 문구의 순서는 고정하지 않는다.
+
+## v0.9.0 이력서 판정
+
+측정이 끝난 문장만 판정했다. `docs/review_resume.md`는 수정하지 않았다. 고칠 문장과 넣지 않을 문장은 여기에 둔다. 개선율은 계산하지 않았다. 결함은 기존 Phase 2 목록에 이미 있다.
+
+### 로컬 이력서
+
+| 위치 | 판정 | 이유 |
+| --- | --- | --- |
+| 8행, 42행, 65행, 128행의 이미지 | 수정 | 리뷰 1에서 빈 목록과 `http` URL은 key를 유지했고, 새 key만 교체했다. 유지 응답의 `images`는 빈 목록이다. 제거 API는 없다. 재발을 막았다는 일반 문장으로 두지 않는다 |
+| 37행의 포인트와 `ROW_NUMBER` | 수정 | 한 줄에 두 경로가 있다. 일반 잔액 불일치 0건은 사용자 1명, 적립 10·차감 10, 5번 반복이다. `ROW_NUMBER`는 리뷰 추천만이다 |
+| 39행, 67행, 128행의 추천 | 수정 | 리뷰 추천 16행, 상품 ID 중복 0건. 상품 추천 원문에는 `ROW_NUMBER`가 없다. 두 쿼리를 한 문장으로 두지 않는다 |
+| 66행, 128행의 포인트 | 수정 | 확인한 것은 그 동시 갱신이다. 베스트 지급 9행과 재측정 1행을 같은 문장에 넣지 않는다. 모든 지급 경로가 안전하다고 쓰지 않는다 |
+| 11행, 44행, 68행, 136행의 `.env` | 유지 | 현재 루트 Dockerfile에 `.env` COPY가 없다. workflow는 Secrets로 env 파일을 만든다. 이 파일 사실만 유지한다 |
+| 40행, 43행, 68행의 Compose·프록시 | 수정 | 파일에 서비스 4개와 `/api` 프록시가 있다. localhost 연결 실패의 재현과 CORS 분리는 이번 측정에 없다 |
+| 44행, 46행, 69행, 133행의 배포 | 수정 | workflow는 `self-hosted`와 Compose 단계가 있다. 최근 run `25278122824`는 `cancelled`다. EC2 운영 성공과 배포 소요 시간은 제외한다 |
+| 69행의 검색 | 수정 | 키워드 `측정토너`는 상품 1, 삭제 상품 3은 제외. `low_price`는 상품 2, 1 순. 리뷰 `리뷰검색어`는 리뷰 3. 서비스 인자 순서의 브랜드 필터는 빈 목록이라 동작한다고 쓰지 않는다. 배포 문장과 한 줄로 두지 않는다 |
+| 35행의 전역 예외 | 수정 | 빈 로그인 JSON 1건이 400 `Validation Failed`와 다섯 필드 JSON이었다. 모든 오류가 같다는 문장으로 두지 않는다 |
+| 63행의 담당 범위 | 수정 | 검색·이미지 1건·포인트 동시 갱신·파일상 Compose만 이번 근거다. 마이페이지 API 전체와 관리자 API 성공은 측정하지 않았다 |
+| 136행의 인가 | 제외 | 공개·로그인·관리자로 인가를 맞췄다는 문장이다. matcher 밖은 500이고 비로그인 POST는 401이 아니었다. 전체 보호율은 계산하지 않는다 |
+
+10행과 40행의 “연결 실패를 해소”는 재현하지 않았으므로 그 결과 문장은 제외한다. `.env`가 이미지에 없다는 현재 파일 사실과 분리한다.
+
+### 이력서에 없는 문장
+
+확인은 됐지만 로컬 이력서에 없다. 추가하지 않는다.
+
+- 구매자 제한 세 건의 같은 거절 메시지, 주문 스냅샷, `usePoint` 100과 재고 예외 한 번의 롤백
+- 베스트 700원 동시 10스레드의 수정 전 9행과 잠금 뒤 확인의 1행
+- 파일 1건의 PUT 200, DB의 key, `X-Amz-Expires` 600과 300
+- 선정 쿼리의 리뷰 4, 5, 6, 7
+- 다섯 보안 요청의 상태 코드
+
+주문 한 번의 롤백을 모든 주문 경로의 단일 트랜잭션이라고 쓰면 제외다. 베스트 1행을 모든 지급이 안전하다는 문장으로 쓰면 제외다.
+
+### 제외
+
+- 운영 cron이 매달 실행되어 700원을 지급했다
+- 배포 성공률, 배포 소요 시간, MinIO 전후의 CPU·메모리
+- 추천·검색의 개선율, p95
+- API 전체 보호율과 401이 인증 POST의 결과라는 문장
+
+줄인 문장의 초안은 `measure.resume-lines.md`에 있다. 그 초안을 이력서 파일에는 넣지 않았다.
