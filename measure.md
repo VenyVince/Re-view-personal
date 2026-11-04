@@ -2,7 +2,7 @@
 
 계획의 기준 커밋은 `c95dd83d`다. 이 작업 트리의 HEAD는 `c84fbc3a`다. `src`, `infra`, `View`, 루트 `Dockerfile`은 `c95dd83d`와 같다. `.github/workflows/deploy.yml`은 빈 줄만 다르다. 단계, `self-hosted`, Secrets, `compose down`, `build --no-cache`, `up -d`는 같다.
 
-반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색, v0.5.0 주문·포인트다.
+반영 판정은 v0.9.0에서 채운다. 여기의 결과는 파일에서 읽은 사실, 측정 프로파일로 확인한 적재 건수, v0.2.0 포인트 동시성, v0.3.0 추천 SQL, v0.4.0 헤더 검색, v0.5.0 주문·포인트, v0.6.0 이미지·MinIO다.
 
 ## E0 결과 표
 
@@ -11,7 +11,7 @@
 | 바우만 4기준 일치, 리뷰 수·별점 가중치, 부분 일치, `ROW_NUMBER`로 상품당 대표 리뷰 1개, MyBatis SQL | `src/main/resources/mapper/recommendations/RecommendationsMapper.xml`의 `findRecommendProducts`, `findRecommendReviews`. `src/main/java/com/review/shop/service/recommendations/RecommendationsService.java` | 현재 코드 `c95dd83d`. 추천 SQL 이력 `e7c2fa82`, `9b4be372`, `54d9aa3b` | 정답 픽스처의 4축 일치, 2축 일치, 상품당 리뷰 2개, `is_checked = 1`의 1.2배. 리뷰 2,000건에서 워밍업 2회 뒤 10회. `EXPLAIN PLAN` 1회 | 아래 v0.3.0. 리뷰 16행, 상품 ID 중복 0건. 상품 1의 대표는 리뷰 2, 점수 72. 상품 쿼리 16행에 상품 1(120) 포함, 상품 2(60) 제외. 리뷰 2,000건에서 상품 쿼리 평균 2.357ms 최댓값 2.807ms, 리뷰 쿼리 평균 11.481ms 최댓값 13.299ms | 상품 쿼리 원문에는 `ROW_NUMBER`가 없다. 실행 계획의 `ROW_NUMBER`는 `FETCH FIRST 16`이다. `deleted_at` 조건은 없다. `e7c2fa82`에는 리뷰 추천 SQL이 없다. 개선율은 계산하지 않았다 | 미판정 |
 | 주문 상품에 연결해 실제 구매자만 리뷰를 작성. 주문 시점의 상품명·가격 저장. 포인트 잔액과 분리된 이력 | `ProductReviewService.canCreate`. `src/main/resources/mapper/order/OrderItemIdMapper.xml`. `OrdersMapper.xml`의 `ORDER_ITEM.PRODUCT_NAME`, `PRODUCT_PRICE`. `src/main/resources/mapper/userinfo/other/point/PointMapper.xml` | 현재 코드 `c95dd83d` | 주문상품 없음, 타인 `order_item_id`, 이미 리뷰가 있는 `order_item_id`, 본인 주문상품 각 1건. 주문 후 상품명·가격 변경. `usePoint` 1건. 재고 부족 예외 뒤 주문 행과 포인트 이력 | 아래 v0.5.0. 거절 3건은 모두 `canCreate` false와 `잘못된 접근입니다.` 본인 미작성 주문상품 1은 true. 상품명을 바꾼 뒤 기존 주문상품은 `측정토너` 12,000, 그 뒤 만든 주문상품은 `변경토너` 999. `usePoint` 100은 잔액 9,900, USE 1행. 재고 0 상품 주문은 예외 뒤 주문 수와 잔액이 그대로 | 거절 이유는 메시지로 구분되지 않는다. 확인한 롤백은 `processOrder` 한 번의 재고 예외다. 단일 트랜잭션 문장은 이력서에 없다 | 미판정 |
 | 사용자 행을 잠그고 같은 트랜잭션에서 계산·갱신 | `src/main/resources/mapper/userinfo/other/point/PointMapper.xml`의 `selectForUpdate`. `src/main/java/com/review/shop/service/userinfo/other/PointService.java`의 `updateUserPoint`, `addReviewPoint`, `usePoint`, `addBestReviewPoint` | 락이 들어온 커밋 `1d954cca`. 확인 순서 변경은 이번 측정에서 `PointService`에 반영 | 사용자 1명, 시작 잔액 10,000, 적립 100과 차감 100을 섞어 20개 동시, 5번 반복. 같은 사용자·같은 리뷰에 `addBestReviewPoint` 10스레드 1회 | 일반 잔액·이력 불일치 0건. 수정 전 베스트 700원 EARN 9행. 잠금 뒤 확인으로 바꾼 재측정은 1행. 아래 v0.2.0 | `getCurrentUserRole()`은 잠금을 잡은 뒤 로그인 아이디로 `USER_TABLE.role`을 다시 조회한다. `point_history`에는 중복 방지 유니크 제약이 없다 | 미판정 |
-| 리뷰 수정 시 `http` URL은 무시하고, 새 object key가 있을 때만 교체 | `src/main/java/com/review/shop/service/review/ProductReviewService.java`의 `filterObjectKeys`, `updateReview` | 필터 커밋 `63521f66`. 현재 코드 `c95dd83d` | `images`가 비어 있음, `http` URL만, `reviews/...` key, 본문이 비어 예외. 교체 1건의 MinIO 객체 | 미측정 | 수정 API에 이미지 제거 분기가 없다 | 미판정 |
+| 리뷰 수정 시 `http` URL은 무시하고, 새 object key가 있을 때만 교체 | `src/main/java/com/review/shop/service/review/ProductReviewService.java`의 `filterObjectKeys`, `updateReview` | 필터 커밋 `63521f66`. 현재 코드 `c95dd83d` | 리뷰 1. `images`가 비어 있음, `http` URL만, `reviews/...` key, 본문이 비어 예외. 교체 1건의 MinIO 객체 | 아래 v0.6.0. 빈 목록과 `http` URL은 key `reviews/fixture/review-1.jpg` 유지. 본문 없음은 `리뷰 내용이 필수입니다`이고 key 유지. 새 key 1건은 그 key로 교체되고 객체 크기 13 | 수정 API에 이미지 제거가 없다. `selectReviewById`는 `REVIEW_IMAGES`를 읽지 않아 유지 경로의 응답 `images`는 빈 목록이다 | 미판정 |
 | `Client → Nginx → Spring Boot → Oracle / MinIO`를 EC2 Compose로 운영. GitHub Actions self-hosted runner와 Secrets. 이미지에 `.env` 없음 | `infra/docker-compose.yml`. `View/nginx/default.conf`. `View/Dockerfile`. `.github/workflows/deploy.yml`. 루트 `Dockerfile` | 현재 코드 `c95dd83d`. workflow 파일은 `c84fbc3a`에서 빈 줄만 다름 | 서비스 4개, `/api` 프록시, `self-hosted`, Secrets, 루트 Dockerfile의 `.env` COPY 유무. Actions는 최근 실행의 상태와 run id. EC2 재배포 없음 | 아래 C2. 최근 실행은 `cancelled`, run id `25278122824` | 운영 배포 성공률은 이 파일 대조로 말하지 않는다 | 미판정 |
 | 소개 문장의 검색·추천·이미지·포인트·배포 | 검색 `src/main/java/com/review/shop/service/search/HeaderSearchService.java`, `src/main/resources/mapper/search/header/HeaderSearchProductMapper.xml`, `HeaderSearchReviewMapper.xml`. 추천·이미지·포인트·배포는 위 행의 경로 | 현재 코드 `c95dd83d`. 정렬 키 변경 `2c4f24ab` | 상품명 키워드, 브랜드 필터, 삭제 상품 제외, 기본 정렬, 정렬 하나. 리뷰 검색 키워드 1건과 10회 시간 | 아래 v0.4.0. 키워드 `측정토너`는 상품 1, 삭제 상품 3은 제외. `filter_brand=MeasureBrand`는 상품 1. 기본 정렬과 `latest`는 1, 2 순. `low_price`는 2, 1 순. 리뷰 키워드 `리뷰검색어`는 리뷰 3. 리뷰 2,000건에서 상품 평균 6.396ms 최댓값 7.968ms, 리뷰 평균 15.181ms 최댓값 17.447ms | 2글자 제한은 `HeaderSearchController`에 있고 SQL에는 없다. 서비스는 브랜드를 `filter_category` 자리에 넘긴다. `2c4f24ab`는 술어가 같고 정렬만 달라 개선율을 계산하지 않았다 | 미판정 |
 
@@ -19,7 +19,7 @@
 
 | 항목 | 파일 경로 | 커밋 해시 | 조건 | 결과 | 한계 | 반영 판정 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C1 MinIO | `src/main/java/com/review/shop/image/ImageService.java`. `src/main/java/com/review/shop/image/minio/MinioConfig.java` | `c95dd83d` | 파일 1건. object key, PUT URL, DB의 key, GET URL, 코드의 만료 10분·5분, 객체 존재 | 미측정 | `main`의 MinIO 클라이언트는 `MINIO_URL` 하나다 | 미판정 |
+| C1 MinIO | `src/main/java/com/review/shop/image/ImageService.java`. `src/main/java/com/review/shop/image/minio/MinioConfig.java`. `ImageUploadController` | `c95dd83d` | 파일 1건. object key, PUT URL, DB의 key, GET URL, 코드의 만료 10분·5분, 객체 존재 | 아래 v0.6.0. 응답 키는 `objectKey`, `presignedUrl`. PUT 200, DB는 URL이 아닌 key, GET은 다른 URL. `X-Amz-Expires`는 PUT 600, GET 300. 객체 크기 13 | `main`의 MinIO 클라이언트는 `MINIO_URL` 하나다. 만료 시각까지 기다리지 않았다 | 미판정 |
 | C3 스케줄러 | `src/main/java/org/spring/project/re_view/ReViewApplication.java`의 `@EnableScheduling`. `src/main/java/com/review/shop/util/ReviewScheduler.java`. `ProductreviewMapper.xml`의 `selectBestReviewIds` | `c95dd83d` | cron `0 0 0 1 * *`, zone `Asia/Seoul`, 좋아요 20 초과, 상품 리뷰 수 30 초과, 상위 10%. `runUpdateBestReviewsNow()` 2회 | 미측정 | 운영 로그가 없으면 정기 실행이라고 쓰지 않는다. 동시 중복은 A1 결과를 인용한다 | 미판정 |
 | B3 Security | `src/main/java/com/review/shop/config/SecurityConfig.java` 112행 `anyRequest().permitAll()` | `c95dd83d` | 공개 GET 1개, 인증 POST 1개의 401, `/api/admin/**` 1개의 403, matcher 밖 1개, Validation 1개 | 미측정 | 전체 보호율은 계산하지 않는다 | 미판정 |
 
@@ -42,7 +42,7 @@ Oracle을 띄운 뒤 `docker compose ps`로 측정 컨테이너가 `gvenzl/oracl
 
 ## E1 스키마·시드·프로파일
 
-측정 Oracle은 `measure/docker-compose.yml`의 `oracle-db` 하나다. 이미지는 `infra/docker-compose.yml`과 같은 `gvenzl/oracle-xe:latest`다. BE·FE는 올리지 않는다. `infra/.env`가 없고, 그 compose의 데이터 볼륨은 `~/volumes/oracle-data`라서 제품 compose 파일은 수정하지 않고 측정 compose를 따로 둔다.
+측정 Oracle은 `measure/docker-compose.yml`의 `oracle-db`다. 이미지는 `infra/docker-compose.yml`과 같은 `gvenzl/oracle-xe:latest`다. v0.6.0에서 같은 파일에 `minio`(`quay.io/minio/minio`, 컨테이너 `measure-minio`, 호스트 9000)를 추가했다. 계정은 측정 프로파일과 같은 `measure` / `measure_local`이고 볼륨은 `measure-minio-data`다. `infra/.env`와 `~/volumes/minio_data`는 쓰지 않는다. BE·FE는 올리지 않는다. `infra/.env`가 없고, 제품 compose의 Oracle 볼륨은 `~/volumes/oracle-data`라서 제품 compose 파일은 수정하지 않고 측정 compose를 따로 둔다.
 
 접속은 `src/test/resources/application-measure.properties`의 프로파일 `measure`다. `application-test.properties`와 `ReViewApplicationTests`는 바꾸지 않았다. 기본 `mvn test`는 surefire `excludedGroups=measure`라 이 프로파일 테스트를 돌리지 않는다.
 
@@ -222,3 +222,38 @@ diff의 WHERE 술어는 현재와 같다. 바뀐 것은 정렬 키 이름과 `lo
 상품 18의 재고는 0이다. `processOrder`는 `usePoint`를 먼저 호출하고, 이어서 같은 클래스의 `checkAndDeductStock`을 호출한다. `deductStock`은 `stock >= quantity`일 때만 재고를 줄인다. 수량이 1이면 반영 행이 0이고 `WrongRequestException: 재고가 부족합니다. 상품ID: 18`이 난다. `processOrder`에 `@Transactional`이 있고 `usePoint`는 다른 빈의 기본 전파라 그 트랜잭션에 들어온다. 예외 뒤 주문 수는 5 그대로, 잔액은 9,900 그대로, USE 50원 행은 0 그대로였다. 이 한 번의 호출에서 포인트 차감과 주문 저장이 같이 롤백된 것은 확인했다. 다른 진입점까지 한 트랜잭션이라고 쓰지 않는다.
 
 `checkAndDeductStock`과 `saveOrderToDatabase`에는 `@Transactional`이 없다. 재고 차감과 주문 저장은 `processOrder` 안의 같은 클래스 호출이다.
+
+## v0.6.0 이미지·MinIO
+
+`ReviewImageMeasureTest`가 리뷰 1에 `ProductReviewService.updateReview`를 호출하고, `ImageService.uploadReviewImages`로 URL을 받은 뒤 그 URL에 바이트를 직접 PUT했다. 로그인 아이디는 `measure_user`다. MinIO는 `measure-minio`다. 앱은 버킷을 만들지 않아 테스트가 버킷 `measure`가 없으면 만들었다. 끝난 뒤 리뷰 1의 본문은 `풀매치 기본`, 평점은 4.5, 이미지 key는 `reviews/fixture/review-1.jpg`로 되돌렸다. `0884094a`는 부팅하지 않았다.
+
+### 이미지 보존
+
+대상은 리뷰 1, 작성자 user 1, 좋아요 5, `is_checked` 0이다. 시작 key는 `reviews/fixture/review-1.jpg` 한 줄이다. `filterObjectKeys`는 null과 `http`로 시작하는 문자열을 버린다.
+
+| 경우 | 요청 | `REVIEW_IMAGES` | 그 외 |
+| --- | --- | --- | --- |
+| 본문 없음 | content 빈 문자열, images 빈 목록 | `reviews/fixture/review-1.jpg` | `WrongRequestException: 리뷰 내용이 필수입니다`. 본문은 `풀매치 기본` |
+| 이미지 없음 | content `측정수정`, images 빈 목록 | 같은 key | 행을 지우지 않음 |
+| URL만 | `http://example.com/old.jpg` | 같은 key | `http`로 시작하는 값은 테이블에 없음 |
+| 새 key | 아래 발급 key 1개 | 그 key 한 줄 | 객체 크기 13바이트 |
+
+`updateReview`는 필터 결과가 비면 `deleteReviewImagesByReviewId`를 호출하지 않는다. 이미지 제거 분기는 없고, 제거 테스트는 만들지 않았다.
+
+유지 경로의 응답은 `selectReviewById`를 다시 읽은 뒤 `getImages()`를 서명한다. 그 조회는 `REVIEW_IMAGES`를 가져오지 않는다. DTO의 `images` 기본값은 빈 목록이라, DB key는 유지되지만 응답의 `images`는 비어 있고 기존 key에 대한 GET URL은 만들어지지 않는다.
+
+### 파일 1건
+
+`ImageUploadController`의 `POST /api/images/reviews`는 JSON `ImageRequestDTO.file_name`만 받는다. 테스트는 그 컨트롤러가 그대로 반환하는 `uploadReviewImages("measure.jpg")`를 호출했다. 역할은 `USER`라 관리자 거절에는 들어가지 않았다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 응답 키 | `objectKey`, `presignedUrl`. 값에 파일 바이트 없음 |
+| object key | `reviews/932e1d22-1bb5-40eb-992e-902f43d41ef1.jpg` |
+| PUT | 그 URL에 `measure-image` 13바이트. HTTP 200 |
+| DB | `REVIEW_IMAGES.image_url`이 그 key. URL 문자열이 아님 |
+| GET | `presignedUrlGet` 결과는 PUT URL과 다름 |
+| 만료 쿼리 | PUT `X-Amz-Expires=600`, GET `X-Amz-Expires=300`. 코드는 `60 * 10`, `60 * 5` |
+| 객체 | `statObject` 크기 13 |
+
+클라이언트는 `MinioConfig`의 `minio.url` 하나다. 측정 프로파일 값은 `http://127.0.0.1:9000`이다. 만료 시각이 지날 때까지 기다리지 않았고, CPU·메모리 감소율은 계산하지 않았다.

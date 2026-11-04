@@ -1,6 +1,18 @@
-# Measurement Oracle only. Same image as infra/docker-compose.yml service oracle-db.
-# BE and FE are not built. infra/.env and ~/volumes/oracle-data are not used.
+# Measurement Oracle and MinIO. Same images as infra/docker-compose.yml.
+# BE and FE are not built. infra/.env and the product data volumes are not used.
 services:
+  minio:
+    image: quay.io/minio/minio
+    container_name: measure-minio
+    ports:
+      - "9000:9000"
+    environment:
+      MINIO_ROOT_USER: measure
+      MINIO_ROOT_PASSWORD: measure_local
+    command: server /data
+    volumes:
+      - measure-minio-data:/data
+
   oracle-db:
     image: gvenzl/oracle-xe:latest
     container_name: measure-oracle
@@ -18,3 +30,4 @@ services:
 
 volumes:
   measure-oracle-data:
+  measure-minio-data:

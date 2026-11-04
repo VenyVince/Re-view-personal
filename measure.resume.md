@@ -160,6 +160,8 @@ v0.4.0에서 이 측정을 실행했다. 숫자는 `measure.md`의 v0.4.0이다.
 
 교체 1건만 MinIO에 객체가 있는지도 본다. C1과 같은 MinIO를 쓴다. 제거 분기가 없으므로 제거 테스트는 만들지 않고 “수정 API에는 이미지 제거가 없음”이라고 적는다. `0884094a`는 다시 부팅하지 않는다. 현재 필터의 통과 결과가 이력서 문장의 근거다.
 
+v0.6.0에서 이 측정을 실행했다. 숫자는 `measure.md`의 v0.6.0이다. 리뷰 1의 key `reviews/fixture/review-1.jpg`는 빈 목록과 `http` URL에서 유지됐다. 본문이 비면 `리뷰 내용이 필수입니다`이고 key는 그대로였다. 새 key 1건은 그 key로 바뀌었고 객체 크기는 13바이트였다. 유지 경로의 응답 `images`는 빈 목록이다.
+
 ### B2. 주문·포인트
 
 각 1건이면 된다.
@@ -196,6 +198,8 @@ CSRF와 `testcode` 브랜치 대조는 하지 않는다. 이번 근거는 `main`
 5. 그 key의 객체가 있는지
 
 이 경로가 확인되면 BE가 파일 본문을 받지 않는다고 쓸 수 있다. CPU·메모리 감소율은 쓰지 않는다. public/private 분리는 현재 `main`의 구조가 아니다.
+
+v0.6.0에서 이 경로를 파일 1건으로 실행했다. 발급 응답은 `objectKey`와 `presignedUrl`이고 파일 바이트는 없었다. PUT은 200이었고 DB에는 URL이 아니라 key가 남았다. GET URL은 PUT URL과 달랐다. URL의 `X-Amz-Expires`는 PUT 600, GET 300으로 코드의 10분·5분과 같았다. 만료 시각까지 기다리지 않았다.
 
 ### C2. Compose와 Actions
 
@@ -329,6 +333,7 @@ Phase 1은 아래를 구현하지 않는다. 측정이 실패하거나 코드에
 - 베스트 포인트 이력의 중복 방지 유니크 제약. 확인을 락 뒤로 옮기는 변경은 v0.2.0 재측정에서 했다.
 - `getCurrentUserRole()`을 락 밖으로 옮기는 변경.
 - 이미지 제거 API, MinIO 원본 삭제, object key와 기존 이미지 id를 나누는 DTO.
+- `updateReview` 유지 경로는 `selectReviewById`가 `REVIEW_IMAGES`를 읽지 않아 응답 `images`가 빈 목록이다. DB key는 유지된다.
 - MinIO public/private 클라이언트 분리.
 - 테스트만을 위한 예외 주입 분기.
 
