@@ -35,11 +35,11 @@
 
 **완료**
 
-- [ ] Oracle XE가 `localhost:1522/XEPDB1`로 기동되어 있다
-- [ ] `MEASURE`와 `MEASURE_PERF`에 접속된다
-- [ ] fixture 건수가 상품 20, 리뷰 40이다
-- [ ] perf 건수가 사용자 20, 상품 200, 리뷰 2,000이다
-- [ ] JDK 21에서 `./mvnw`가 동작한다
+- [x] Oracle XE가 `localhost:1522/XEPDB1`로 기동되어 있다
+- [x] `MEASURE`와 `MEASURE_PERF`에 접속된다
+- [x] fixture 건수가 상품 20, 리뷰 40이다
+- [x] perf 건수가 사용자 20, 상품 200, 리뷰 2,000이다
+- [x] JDK 21에서 `./mvnw`가 동작한다
 
 ### 3.2 일반 포인트 동시성 정합성의 재측정
 
@@ -55,10 +55,10 @@
 
 **완료**
 
-- [ ] `PointConcurrencyMeasureTest`가 단독으로 실행된다
-- [ ] 5라운드의 성공 건수, 실패 건수, `expected`, `point`, `history`가 콘솔에 있다
-- [ ] `balanceHistoryMismatches`가 콘솔에 있다
-- [ ] `bestRows`와 `bestFailures`가 콘솔에 있다
+- [x] `PointConcurrencyMeasureTest`가 단독으로 실행된다
+- [x] 5라운드의 성공 건수, 실패 건수, `expected`, `point`, `history`가 콘솔에 있다
+- [x] `balanceHistoryMismatches`가 콘솔에 있다
+- [x] `bestRows`와 `bestFailures`가 콘솔에 있다
 
 ### 3.3 추천 SQL 실행 시간의 재측정
 
