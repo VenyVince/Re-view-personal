@@ -75,10 +75,10 @@
 
 **완료**
 
-- [ ] 상품 추천 SQL의 fixture 평균, 최댓값, 10회 표본이 콘솔에 있다
-- [ ] 리뷰 추천 SQL의 fixture 평균, 최댓값, 10회 표본이 콘솔에 있다
-- [ ] 두 SQL의 perf 평균, 최댓값, 10회 표본이 콘솔에 있다
-- [ ] 레거시 SQL의 `rowsPerRun`, 평균, 최댓값, `onlyCurrent`, `onlyLegacy`가 콘솔에 있다
+- [x] 상품 추천 SQL의 fixture 평균, 최댓값, 10회 표본이 콘솔에 있다
+- [x] 리뷰 추천 SQL의 fixture 평균, 최댓값, 10회 표본이 콘솔에 있다
+- [x] 두 SQL의 perf 평균, 최댓값, 10회 표본이 콘솔에 있다
+- [x] 레거시 SQL의 `rowsPerRun`, 평균, 최댓값, `onlyCurrent`, `onlyLegacy`가 콘솔에 있다
 
 ### 3.4 검색 SQL 실행 시간의 재측정
 
