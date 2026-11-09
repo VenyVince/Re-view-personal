@@ -14,6 +14,7 @@
 | Fixture DB | `MEASURE` / `measure_local` |
 | Perf DB | `MEASURE_PERF` / `measure_local` |
 | 이번 실행 Perf 건수 | 사용자 20, 상품 200, 리뷰 2,000 |
+| Fixture 건수 | 이 테스트는 테이블 건수를 출력하지 않음. 2026-11-09 추천 SQL 실행에서 상품 20, 리뷰 40 |
 | Oracle | 21c Express Edition Release 21.0.0.0.0. 2026-11-08 조회. 이번 실행에서 `v$version`은 다시 조회하지 않음 |
 
 원본 로그: `target/surefire-reports/TEST-org.spring.project.re_view.measure.HeaderSearchMeasureTest.xml`의 `system-out`.
