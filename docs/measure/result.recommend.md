@@ -167,10 +167,23 @@ Plan hash value: 381092898
 |* 15 |            SORT JOIN                   |                 |    20 |   440 |       |     4  (25)| 00:00:01 |
 |  16 |             TABLE ACCESS FULL          | USER_TABLE      |    20 |   440 |       |     3   (0)| 00:00:01 |
 |  17 |           TABLE ACCESS FULL            | REVIEW          |  2000 | 72000 |       |     7   (0)| 00:00:01 |
+|  18 |        BUFFER SORT                     |                 |     1 |   252 |       |    16   (7)| 00:00:01 |
+|  19 |         VIEW                           | VW_LAT_C184B619 |     1 |   252 |       |     0   (0)| 00:00:01 |
+|  20 |          VIEW                          | VW_LAT_5E5D704D |     1 |   252 |       |     0   (0)| 00:00:01 |
+|* 21 |           VIEW                         |                 |     1 |   278 |       |     0   (0)| 00:00:01 |
+|* 22 |            WINDOW BUFFER PUSHED RANK   |                 |     1 |   278 |       |     0   (0)| 00:00:01 |
+|* 23 |             TABLE ACCESS BY INDEX ROWID| REVIEW_IMAGES   |     1 |   278 |       |     0   (0)| 00:00:01 |
+|  24 |              INDEX FULL SCAN           | SYS_C008373     |     1 |       |       |     0   (0)| 00:00:01 |
+|  25 |       BUFFER SORT                      |                 |     1 |   252 |       |  4280   (1)| 00:00:01 |
+|  26 |        VIEW                            | VW_LAT_C184B619 |     1 |   252 |       |     2   (0)| 00:00:01 |
+|  27 |         VIEW                           | VW_LAT_4BB1B9CA |     1 |   252 |       |     2   (0)| 00:00:01 |
+|* 28 |          VIEW                          |                 |     1 |   265 |       |     2   (0)| 00:00:01 |
+|* 29 |           WINDOW BUFFER PUSHED RANK    |                 |     1 |   267 |       |     2   (0)| 00:00:01 |
+|* 30 |            TABLE ACCESS FULL           | PRODUCT_IMAGE   |     1 |   267 |       |     2   (0)| 00:00:01 |
 ------------------------------------------------------------------------------------------------------------------
 ```
 
-아래쪽 Id 18–30은 리뷰 이미지와 상품 이미지 lateral view다. 원문 전체는 위 XML `system-out`에 있다.
+Predicate Information은 `target/surefire-reports/TEST-org.spring.project.re_view.measure.RecommendSqlMeasureTest.xml`의 `system-out`에 있다.
 
 ## 8. 해석
 

@@ -34,8 +34,23 @@
 | 검색 SQL Perf | 실행 완료 | 상품 평균 6.403ms, 최댓값 8.289ms. 리뷰 평균 15.950ms, 최댓값 18.577ms |
 | 예상 실행 계획 | 추천 2개, 검색 2개 수집 | 상품 추천 예상 Cost 28. 리뷰 추천 예상 Cost 4281. 상품 검색 예상 Cost 9. 리뷰 검색 예상 Cost 423 |
 
-실행 계획 수집과 시간 측정은 따로 본다. 네 SQL의 계획 원문은 각 상세 파일에 있다. 네 SQL을 한 표로 비교한 분석은 아직 없다.
+실행 계획 수집과 시간 측정은 따로 본다. 비교 표는 아래 4절이다. 원문은 `result.recommend.md`와 `result.search.md`에 있다.
 
-## 3. 제한
+## 3. 예상 실행 계획 비교
+
+Perf DB의 `EXPLAIN PLAN FOR`와 `DBMS_XPLAN.DISPLAY()` 결과만 적는다. 실제 실행 통계가 아니다.
+
+| 분석 항목 | 상품 추천 SQL | 리뷰 추천 SQL | 상품 검색 SQL | 리뷰 검색 SQL |
+|---|---|---|---|---|
+| Plan hash | 2939117215 | 381092898 | 3623065135 | 4282550867 |
+| 테이블 접근 | `PRODUCT` full, `PRODUCT_IMAGE` full, `BAUMANN` index rowid | `REVIEW` full, `PRODUCT` full, `USER_TABLE` full, `BAUMANN` full, `PRODUCT_IMAGE` full, `REVIEW_IMAGES` full | `PRODUCT` full, `PRODUCT_IMAGE` full | `REVIEW` full, `PRODUCT` full, `USER_TABLE` full, `PRODUCT_IMAGE` full, `REVIEW_IMAGES` full |
+| 인덱스 | `SYS_C008307` index full scan | `SYS_C008307` index full scan, `SYS_C008373` index full scan | `SYS_C008307` index full scan | `SYS_C008307` index full scan, `SYS_C008373` index unique scan |
+| 조인 | merge join, merge join outer | hash join, merge join, merge join outer | hash join right outer, merge join | hash join, merge join, merge join outer |
+| 정렬 | sort order by, sort join, window sort pushed rank | window sort pushed rank, sort join | sort order by, sort join | sort order by, sort join, sort aggregate |
+| 윈도우 함수 | 계획에 `ROW_NUMBER`. SQL 문자열 확인은 없음 | 계획에 `ROW_NUMBER` | 계획에 없음 | 계획에 `ROW_NUMBER` |
+| 예상 Cost | 28 | 4281 | 9 | 423 |
+| 계획에 보이는 특이사항 | 상위 16행 제한. 점수 조건 filter | TempSpc 1240K. 상품별 `RN=1` | `DELETED_AT IS NULL`. 이름·브랜드·성분·바우만 `LIKE` | `DELETED_AT IS NULL`. content·nickname `LIKE` |
+
+## 4. 제한
 
 추천 레거시 SQL은 measure 커넥션 결과라서 Perf 시간과 개선율로 바꾸지 않았다. 검색의 브랜드를 카테고리 인자에 넣은 0건은 매퍼 직접 호출이다. 예외 없이 반환한 Best 호출 수는 상세 결과에 없으므로 여기에도 없다.
