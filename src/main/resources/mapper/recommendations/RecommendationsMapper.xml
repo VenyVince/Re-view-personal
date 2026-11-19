@@ -73,10 +73,41 @@
         )
     </sql>
 
+    <!--
+      상품별 유효 리뷰(1~5, NULL 제외, soft-delete 제외) 집계.
+      valid_stddev_rating(STDDEV_SAMP)는 표준편차 기반 점수표 확정 후 사용 예정.
+      최소 리뷰 개수(N)가 미확정이므로 현재는 2개 이상이면 기존 고정 점수만 적용한다.
+    -->
+    <sql id="productRatingStatsJoin">
+        LEFT JOIN (
+            SELECT
+                r2.product_id,
+                COUNT(*) AS valid_review_count,
+                AVG(r2.rating) AS valid_avg_rating,
+                STDDEV_SAMP(r2.rating) AS valid_stddev_rating
+            FROM review r2
+            WHERE r2.deleted_at IS NULL
+              AND r2.rating IS NOT NULL
+              AND r2.rating &gt;= 1
+              AND r2.rating &lt;= 5
+            GROUP BY r2.product_id
+        ) prs ON prs.product_id = p.product_id
+    </sql>
+
+    <!--
+      별점 유사도 (확정 예외 처리 반영)
+      - 유효 리뷰 0개: 점수 제외(0)
+      - 유효 리뷰 1개: 중립 5점 (표준편차 0을 저분산으로 취급하지 않음)
+      - 유효 리뷰 2개 이상: 최소 기준(N) 미확정이므로 기존 고정 점수
+        (평균과의 차이 0.5 이하 10 / 1.0 이하 5 / 그 외 0)
+        비교 기준 평균은 PRODUCT.rating이 아니라 유효 리뷰 평균(valid_avg_rating)
+    -->
     <sql id="ratingSimilarityScore">
         CASE
-            WHEN ABS(r.rating - p.rating) &lt;= 0.5 THEN 10
-            WHEN ABS(r.rating - p.rating) &lt;= 1.0 THEN 5
+            WHEN NVL(prs.valid_review_count, 0) = 0 THEN 0
+            WHEN prs.valid_review_count = 1 THEN 5
+            WHEN ABS(r.rating - prs.valid_avg_rating) &lt;= 0.5 THEN 10
+            WHEN ABS(r.rating - prs.valid_avg_rating) &lt;= 1.0 THEN 5
             ELSE 0
         END
     </sql>
@@ -107,6 +138,8 @@
         JOIN BAUMANN rb     ON u.baumann_id = rb.baumann_id
             -- 상품 바우만 타입
         JOIN BAUMANN pb     ON p.baumann_id = pb.baumann_id
+            -- 상품별 유효 별점 집계(개수/평균/표본표준편차)
+        <include refid="productRatingStatsJoin"/>
             -- 리뷰 이미지 없으면 상품 이미지 대신 할당
         LEFT JOIN LATERAL (
         SELECT image_url

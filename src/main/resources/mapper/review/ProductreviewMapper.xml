@@ -126,7 +126,7 @@
         WHERE review_id = #{review_id}
     </update>
 
-    <!-- 상품 평점 = 활성 리뷰 평균, 리뷰 수 = 활성 리뷰 건수 -->
+    <!-- 상품 평점 = 유효 별점(1~5) 활성 리뷰 평균, 리뷰 수 = 동일 조건 건수 -->
     <update id="recalculateProductRating">
         UPDATE product
         SET rating = (
@@ -134,12 +134,18 @@
                 FROM review r
                 WHERE r.product_id = #{product_id}
                   AND r.deleted_at IS NULL
+                  AND r.rating IS NOT NULL
+                  AND r.rating &gt;= 1
+                  AND r.rating &lt;= 5
             ),
             review_count = (
                 SELECT COUNT(*)
                 FROM review r
                 WHERE r.product_id = #{product_id}
                   AND r.deleted_at IS NULL
+                  AND r.rating IS NOT NULL
+                  AND r.rating &gt;= 1
+                  AND r.rating &lt;= 5
             ),
             updated_at = SYSDATE
         WHERE product_id = #{product_id}
