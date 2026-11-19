@@ -9,6 +9,7 @@ import java.util.List;
 @Data
 public class ProductReviewDTO {
     private Integer review_id;
+    private Integer product_id;
     private String content;
     private double rating;
     private int like_count;

@@ -206,9 +206,8 @@ export default function AdminProductEdit() {
                     stock: Number(form.stock),
                     description: form.description,
                     baumann_id: baumann_id,
-                    is_sold_out: form.is_sold_out ?? 0,
-                    rating: form.rating ?? 0,
-                    review_count: form.review_count ?? 0
+                    is_sold_out: form.is_sold_out ?? 0
+                    // rating / review_count는 리뷰 평균으로만 갱신. 관리자 수정 payload에서 제외.
                 },
                 // DB에는 최종 Object Key를 전송합니다. (업로드된 새 키 또는 기존 키)
                 thumbnail_image: finalThumbnailKey,

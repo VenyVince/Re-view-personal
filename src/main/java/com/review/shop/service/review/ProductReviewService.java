@@ -115,6 +115,9 @@ public class ProductReviewService {
             imageService.saveReviewImageObjectKey(createdReview.getReview_id(), objectKeys);
         }
 
+        // 상품 평점/리뷰 수 재계산 (활성 리뷰 평균)
+        productReviewMapper.recalculateProductRating(product_id);
+
         // [변경] 응답용 URL 변환 (Key -> URL)
         List<String> imageUrls = new ArrayList<>();
         if (objectKeys != null) {
@@ -173,6 +176,7 @@ public class ProductReviewService {
     }
 
     // 리뷰 수정
+    @Transactional
     public ProductReviewDTO updateReview(
             int review_id,
             int user_id,
@@ -199,6 +203,9 @@ public class ProductReviewService {
         int updatedRows = productReviewMapper.updateReview(review_id, content, rating);
         if (updatedRows != 1)
             throw new DatabaseException("리뷰 수정 실패");
+
+        // 상품 평점/리뷰 수 재계산 (활성 리뷰 평균)
+        productReviewMapper.recalculateProductRating(review.getProduct_id());
 
         // FE에서 넘어온 값 중 objectKey만 추출
         List<String> newObjectKeys = filterObjectKeys(imagesFromFE);
@@ -254,6 +261,9 @@ public class ProductReviewService {
 
         // Soft Delete
         productReviewMapper.deleteReview(review_id);
+
+        // 상품 평점/리뷰 수 재계산 (활성 리뷰 평균)
+        productReviewMapper.recalculateProductRating(product_id);
 
         // 포인트 회수
         pointService.removeReviewPoint(user_id, review_id);

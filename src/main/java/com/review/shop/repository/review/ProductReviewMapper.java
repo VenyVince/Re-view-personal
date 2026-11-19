@@ -60,6 +60,8 @@ public interface ProductReviewMapper {
     // 리뷰 삭제
     void deleteReview(@Param("review_id")int review_id);
 
+    // 상품 평점/리뷰 수를 활성 리뷰 기준으로 재계산
+    void recalculateProductRating(@Param("product_id") int product_id);
 
     // 기존 베스트 리뷰 초기화
     void resetBestReviews();
