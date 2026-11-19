@@ -175,7 +175,8 @@ export default function AdminProductNew() {
                     price: Number(form.price) || 0,
                     category: form.category.trim(),
                     stock: Number(form.stock) || 0,
-                    rating: 3.0,
+                    // 상품 평점/리뷰 수는 서버가 리뷰 평균으로 산정. 등록 시 0 고정.
+                    rating: 0,
                     description: "",
                     review_count: 0,
                     baumann_id: baumannId,

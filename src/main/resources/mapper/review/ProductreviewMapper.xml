@@ -126,6 +126,25 @@
         WHERE review_id = #{review_id}
     </update>
 
+    <!-- 상품 평점 = 활성 리뷰 평균, 리뷰 수 = 활성 리뷰 건수 -->
+    <update id="recalculateProductRating">
+        UPDATE product
+        SET rating = (
+                SELECT NVL(ROUND(AVG(r.rating), 1), 0)
+                FROM review r
+                WHERE r.product_id = #{product_id}
+                  AND r.deleted_at IS NULL
+            ),
+            review_count = (
+                SELECT COUNT(*)
+                FROM review r
+                WHERE r.product_id = #{product_id}
+                  AND r.deleted_at IS NULL
+            ),
+            updated_at = SYSDATE
+        WHERE product_id = #{product_id}
+    </update>
+
     <!--    베스트 리뷰 선정   -->
     <select id="selectBestReviewIds" resultType="com.review.shop.dto.review.BestReviewDTO">
         SELECT review_id, user_id

@@ -48,6 +48,9 @@ public class AdminProductService {
         if (product == null) {
             throw new WrongRequestException("상품 정보가 전달되지 않았습니다.");
         }
+        // 상품 평점/리뷰 수는 리뷰 평균으로만 산정. 관리자 입력 무시.
+        product.setRating(0);
+        product.setReview_count(0);
         int affected = adminProductMapper.insertProduct(product);
         if (affected == 0) {
             throw new DatabaseException("상품 등록에 실패했습니다.", null);

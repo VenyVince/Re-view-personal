@@ -128,9 +128,7 @@
             PRICE        = #{product.product.price},
             CATEGORY     = #{product.product.category},
             STOCK        = #{product.product.stock},
-            RATING       = #{product.product.rating},
             DESCRIPTION  = #{product.product.description},
-            REVIEW_COUNT = #{product.product.review_count},
             BAUMANN_ID   = #{product.product.baumann_id},
             IS_SOLD_OUT  = #{product.product.is_sold_out},
             UPDATED_AT   = SYSDATE
