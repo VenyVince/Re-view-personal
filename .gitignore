@@ -30,6 +30,9 @@ Thumbs.db
 # Optional local docs / agent notes
 Codex/
 
+# Local review-count analysis. Not used at runtime.
+analysis/
+
 ### STS ###
 .apt_generated
 .classpath

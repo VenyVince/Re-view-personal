@@ -73,8 +73,13 @@
         )
     </sql>
 
+    <!-- 편차 = ABS(리뷰 별점 - 상품 평균 별점). 상품 평균은 기존과 같이 PRODUCT.RATING 이다. -->
     <sql id="ratingSimilarityScore">
         CASE
+            WHEN NVL(prs.valid_cnt, 0) &lt; 2 THEN 0
+            WHEN sb.threshold_stddev IS NULL THEN 0
+            WHEN prs.rating_stddev = 0 AND ABS(r.rating - p.rating) &gt; 0 THEN 0
+            WHEN ABS(r.rating - p.rating) &gt; sb.threshold_stddev THEN 0
             WHEN ABS(r.rating - p.rating) &lt;= 0.5 THEN 10
             WHEN ABS(r.rating - p.rating) &lt;= 1.0 THEN 5
             ELSE 0
@@ -82,6 +87,26 @@
     </sql>
     <!-- 리뷰 추천-->
     <select id="findRecommendReviews" parameterType="java.util.List" resultType="com.review.shop.dto.recommendations.RecommendReviewDTO">
+        WITH product_rating_stats AS (
+            SELECT product_id,
+                   COUNT(*) AS valid_cnt,
+                   STDDEV_POP(rating) AS rating_stddev
+              FROM review
+             WHERE deleted_at IS NULL
+               AND rating BETWEEN 1 AND 5
+             GROUP BY product_id
+        ),
+        stddev_baseline AS (
+            SELECT AVG(rating_stddev) AS threshold_stddev
+              FROM (
+                    SELECT rating_stddev,
+                           ROW_NUMBER() OVER (ORDER BY rating_stddev DESC) AS stddev_rank,
+                           COUNT(*) OVER () AS eligible_cnt
+                      FROM product_rating_stats
+                     WHERE valid_cnt &gt;= 2
+                   )
+             WHERE stddev_rank &lt;= CEIL(eligible_cnt * 0.3)
+        )
         SELECT review_id, content, review_rating, like_count, nickname, review_image_url, product_id, prd_name, rating, is_checked, total_score
         FROM
             ( SELECT r.review_id, r.content, r.rating AS review_rating, r.like_count, r.is_checked,
@@ -107,6 +132,8 @@
         JOIN BAUMANN rb     ON u.baumann_id = rb.baumann_id
             -- 상품 바우만 타입
         JOIN BAUMANN pb     ON p.baumann_id = pb.baumann_id
+        LEFT JOIN product_rating_stats prs ON prs.product_id = p.product_id
+        CROSS JOIN stddev_baseline sb
             -- 리뷰 이미지 없으면 상품 이미지 대신 할당
         LEFT JOIN LATERAL (
         SELECT image_url
