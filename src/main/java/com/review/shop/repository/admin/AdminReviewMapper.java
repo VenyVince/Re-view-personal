@@ -17,6 +17,8 @@ public interface AdminReviewMapper {
             @Param("is_selected") Integer is_selected
     );
 
+    String findActiveSelection(@Param("review_id") int review_id);
+
     // 운영자 픽 시 리뷰 작성자 user_id 반환
     int findReviewer(@Param("review_id") int review_id);
 

@@ -1,6 +1,7 @@
 package org.spring.project.re_view;
 
 import com.review.shop.exception.DatabaseException;
+import com.review.shop.exception.ResourceNotFoundException;
 import com.review.shop.exception.WrongRequestException;
 import com.review.shop.service.admin.AdminReviewService;
 import com.review.shop.service.admin.AdminUserService;
@@ -172,18 +173,27 @@ class PointDefectTest {
         UserFixture user = insertUser(1000);
         int reviewId = insertReview(user, 0, null);
 
-        call(user, () -> adminReviewService.setReviewSelection(reviewId, 1));
-        call(user, () -> adminReviewService.setReviewSelection(reviewId, 1));
-
+        Throwable first = call(user, () -> adminReviewService.setReviewSelection(reviewId, 1));
+        Integer balanceAfterFirst = pointOf(user.userId());
+        List<HistoryRow> historyAfterFirst = historyOf(user.userId());
+        Throwable second = call(user, () -> adminReviewService.setReviewSelection(reviewId, 1));
         Integer balance = pointOf(user.userId());
         List<HistoryRow> history = historyOf(user.userId());
-        System.out.println("POINT_DEFECT C-03-1 balance=" + balance
+        System.out.println("POINT_DEFECT C-03-1 afterFirst=" + balanceAfterFirst
+                + " historyAfterFirst=" + historyAfterFirst
+                + " afterSecond=" + balance
                 + " history=" + history
-                + " selected=" + selected(reviewId));
+                + " selected=" + selected(reviewId)
+                + " first=" + chain(first)
+                + " second=" + chain(second));
 
+        assertNull(first, chain(first).toString());
         assertEquals("1", selected(reviewId));
-        assertEquals(2000, balance);
-        assertEquals(List.of(new HistoryRow("EARN", 500), new HistoryRow("EARN", 500)), history);
+        assertEquals(1500, balanceAfterFirst);
+        assertEquals(List.of(new HistoryRow("EARN", 500)), historyAfterFirst);
+        assertNull(second, chain(second).toString());
+        assertEquals(1500, balance);
+        assertEquals(List.of(new HistoryRow("EARN", 500)), history);
     }
 
     @Test
@@ -203,8 +213,88 @@ class PointDefectTest {
 
         assertNull(error, chain(error).toString());
         assertEquals("0", selected(reviewId));
-        assertEquals(1500, balance);
-        assertEquals(List.of(new HistoryRow("EARN", 500)), history);
+        assertEquals(1000, balance);
+        assertEquals(List.of(), history);
+    }
+
+    @Test
+    @DisplayName("C-03-3 이미 해제된 리뷰를 다시 해제")
+    void clearingSelectionAgainDoesNotPay() {
+        UserFixture user = insertUser(1000);
+        int reviewId = insertReview(user, 0, null);
+
+        Throwable error = call(user, () -> adminReviewService.setReviewSelection(reviewId, 0));
+        Integer balance = pointOf(user.userId());
+        List<HistoryRow> history = historyOf(user.userId());
+        System.out.println("POINT_DEFECT C-03-3 balance=" + balance
+                + " history=" + history
+                + " selected=" + selected(reviewId)
+                + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertEquals("0", selected(reviewId));
+        assertEquals(1000, balance);
+        assertEquals(List.of(), history);
+    }
+
+    @Test
+    @DisplayName("C-03-4 없거나 삭제된 리뷰 채택")
+    void missingOrDeletedSelectionIsNotFound() {
+        UserFixture user = insertUser(1000);
+        int reviewId = insertReview(user, 0, null);
+
+        Throwable missing = call(user, () -> adminReviewService.setReviewSelection(-1, 1));
+        assertTrue(missing instanceof ResourceNotFoundException, chain(missing).toString());
+        assertTrue(chainContains(missing, "설정할 리뷰를 찾을 수 없습니다."), chain(missing).toString());
+
+        jdbc.update("UPDATE review SET deleted_at = SYSDATE WHERE review_id = ?", reviewId);
+        Throwable deleted = call(user, () -> adminReviewService.setReviewSelection(reviewId, 1));
+        Integer balance = pointOf(user.userId());
+        List<HistoryRow> history = historyOf(user.userId());
+        System.out.println("POINT_DEFECT C-03-4 missing=" + chain(missing)
+                + " deleted=" + chain(deleted)
+                + " balance=" + balance
+                + " history=" + history
+                + " selected=" + selected(reviewId));
+
+        assertTrue(deleted instanceof ResourceNotFoundException, chain(deleted).toString());
+        assertTrue(chainContains(deleted, "설정할 리뷰를 찾을 수 없습니다."), chain(deleted).toString());
+        assertEquals("0", selected(reviewId));
+        assertEquals(1000, balance);
+        assertEquals(List.of(), history);
+    }
+
+    @Test
+    @DisplayName("C-03-5 채택 포인트 실패 시 상태 롤백")
+    void selectionRollsBackWhenPointAwardFails() {
+        UserFixture user = insertUser(1000);
+        int reviewId = insertReview(user, 0, null);
+        SecurityContextHolder.clearContext();
+
+        Throwable error;
+        try {
+            adminReviewService.setReviewSelection(reviewId, 1);
+            error = null;
+        } catch (Throwable thrown) {
+            error = thrown;
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+
+        Integer balance = pointOf(user.userId());
+        List<HistoryRow> history = historyOf(user.userId());
+        System.out.println("POINT_DEFECT C-03-5 balance=" + balance
+                + " history=" + history
+                + " selected=" + selected(reviewId)
+                + " error=" + chain(error));
+
+        assertNotNull(error);
+        assertTrue(error instanceof DatabaseException, chain(error).toString());
+        assertTrue(hasCause(error, WrongRequestException.class), chain(error).toString());
+        assertTrue(chainContains(error, "로그인이 필요합니다."), chain(error).toString());
+        assertEquals("0", selected(reviewId));
+        assertEquals(1000, balance);
+        assertEquals(List.of(), history);
     }
 
     @Test
