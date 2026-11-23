@@ -356,7 +356,7 @@ class PointDefectTest {
 
     @Test
     @DisplayName("C-06 인증 없는 스케줄러 지급")
-    void schedulerWithoutAuthenticationRollsBackBestSelection() {
+    void schedulerWithoutAuthenticationAwardsBestReview() {
         UserFixture user = insertUser(1000);
         int reviewId = insertReview(user, 21, 31);
         assertTrue(reviewIsBestCandidate(reviewId), "베스트 선정 SQL 조건을 만족하지 않습니다.");
@@ -382,13 +382,58 @@ class PointDefectTest {
                 + " checked=" + checked
                 + " error=" + chain(error));
 
-        assertNotNull(error, "인증 없이도 예외 없이 종료되었습니다.");
+        assertNull(error, chain(error).toString());
+        assertEquals(1700, balance);
+        assertEquals(List.of(new HistoryRow("EARN", 700)), history);
+        assertEquals("1", checked);
+    }
+
+    @Test
+    @DisplayName("C-06-U 다른 포인트 경로는 인증이 필요하다")
+    void otherPointChangesStillRequireAuthentication() {
+        UserFixture user = insertUser(1000);
+        int reviewId = insertReview(user, 0, null);
+        SecurityContextHolder.clearContext();
+
+        Throwable useError = invokeWithoutAuthentication(() -> pointService.usePoint(user.userId(), 100));
+        Throwable earnError = invokeWithoutAuthentication(() -> pointService.addReviewPoint(user.userId(), reviewId));
+        Throwable removeError = invokeWithoutAuthentication(() -> pointService.removeReviewPoint(user.userId(), reviewId));
+        Throwable selectedError = invokeWithoutAuthentication(
+                () -> pointService.addSelectedReviewPoint(user.userId(), reviewId));
+        Integer balance = pointOf(user.userId());
+        List<HistoryRow> history = historyOf(user.userId());
+        System.out.println("POINT_DEFECT C-06-U use=" + chain(useError)
+                + " earn=" + chain(earnError)
+                + " remove=" + chain(removeError)
+                + " selected=" + chain(selectedError)
+                + " balance=" + balance
+                + " history=" + history);
+
+        assertLoginRequired(useError);
+        assertLoginRequired(earnError);
+        assertLoginRequired(removeError);
+        assertLoginRequired(selectedError);
+        assertEquals(1000, balance);
+        assertEquals(List.of(), history);
+    }
+
+    private Throwable invokeWithoutAuthentication(Runnable action) {
+        SecurityContextHolder.clearContext();
+        try {
+            action.run();
+            return null;
+        } catch (Throwable error) {
+            return error;
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    private void assertLoginRequired(Throwable error) {
+        assertNotNull(error, "인증 없이 포인트 변경이 성공했습니다.");
         assertTrue(error instanceof DatabaseException, chain(error).toString());
         assertTrue(hasCause(error, WrongRequestException.class), chain(error).toString());
         assertTrue(chainContains(error, "로그인이 필요합니다."), chain(error).toString());
-        assertEquals(1000, balance);
-        assertEquals(List.of(), history);
-        assertEquals("0", checked);
     }
 
     private boolean waitUntilBothWaitOnUserLock(Future<CallResult> first, Future<CallResult> second, int userId)
