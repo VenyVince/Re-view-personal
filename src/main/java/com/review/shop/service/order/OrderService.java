@@ -150,12 +150,14 @@ public class OrderService {
     //트랜잭션용 최종 오더
     @Transactional
     public void processOrder(OrderCreateDTO orderCreateDTO) {
-        //포인트 차감 검사 및 반영
-        //이부분은 석현님이 만드신걸로 대체
-        pointService.usePoint(orderCreateDTO.getUser_id(), orderCreateDTO.getUsing_point());
-        //재고 차감 검사 및 반영
+        int usingPoint = orderCreateDTO.getUsing_point();
+        if (usingPoint < 0) {
+            throw new WrongRequestException("사용할 포인트는 0 이상이어야 합니다.");
+        }
+        if (usingPoint > 0) {
+            pointService.usePoint(orderCreateDTO.getUser_id(), usingPoint);
+        }
         checkAndDeductStock(orderCreateDTO);
-        //DB에 주문 정보 저장
         saveOrderToDatabase(orderCreateDTO);
     }
 

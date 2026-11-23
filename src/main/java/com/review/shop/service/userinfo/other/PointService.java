@@ -148,6 +148,12 @@ public class PointService {
     // 유저의 포인트 사용
     @Transactional
     public void usePoint(int user_id, int use_point) {
+        if (use_point < 0) {
+            throw new WrongRequestException("사용할 포인트는 0 이상이어야 합니다.");
+        }
+        if (use_point == 0) {
+            return;
+        }
         processPoint(user_id, null, use_point, "USE", "물품 구매로 인한 차감");
     }
 
