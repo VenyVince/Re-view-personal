@@ -107,12 +107,13 @@
                    )
              WHERE stddev_rank &lt;= CEIL(eligible_cnt * 0.3)
         )
-        SELECT review_id, content, review_rating, like_count, nickname, review_image_url, product_id, prd_name, rating, is_checked, total_score
+        SELECT review_id, content, review_rating, like_count, nickname, review_image_url, product_id, prd_name, product_rating, is_checked, total_score, created_at
         FROM
             ( SELECT r.review_id, r.content, r.rating AS review_rating, r.like_count, r.is_checked,
                       u.nickname,
                       COALESCE(ri.image_url, pi.image_url) AS review_image_url,
-                      p.product_id, p.prd_name, p.rating,
+                      p.product_id, p.prd_name, p.rating AS product_rating,
+                      r.created_at,
                       -- 리뷰 추천 점수계산로직
         CASE WHEN r.is_checked = 1 THEN
             (<include refid="reviewBaumannScore"/> + <include refid="productBaumannMatchScore"/> + <include refid="ratingSimilarityScore"/>) * 1.2
@@ -124,7 +125,7 @@
                 (<include refid="reviewBaumannScore"/> + <include refid="productBaumannMatchScore"/> + <include refid="ratingSimilarityScore"/>) * 1.2
                 ELSE
                 (<include refid="reviewBaumannScore"/> + <include refid="productBaumannMatchScore"/> + <include refid="ratingSimilarityScore"/>)
-                END DESC, r.like_count DESC ) AS rn
+                END DESC, r.like_count DESC, r.created_at DESC, r.review_id ASC ) AS rn
         FROM REVIEW r
         JOIN PRODUCT p      ON r.product_id = p.product_id
         JOIN USER_TABLE u   ON r.user_id = u.user_id
@@ -148,10 +149,11 @@
         WHERE product_id = p.product_id
         AND is_thumbnail = 'Y'
         FETCH FIRST 1 ROWS ONLY
-        ) pi ON 1 = 1 )
+        ) pi ON 1 = 1
+        WHERE r.deleted_at IS NULL )
         -- 상품별 1등 리뷰만 할당
         WHERE rn = 1
-        ORDER BY total_score DESC, like_count DESC
+        ORDER BY total_score DESC, like_count DESC, created_at DESC, review_id ASC
         FETCH FIRST 16 ROWS ONLY
     </select>
 
