@@ -246,7 +246,7 @@ class PointDefectTest {
 
         assertNull(error, chain(error).toString());
         assertEquals(1000, balance);
-        assertEquals(List.of(new HistoryRow("USE", 0)), history);
+        assertEquals(List.of(), history);
     }
 
     @Test
@@ -258,9 +258,10 @@ class PointDefectTest {
         List<HistoryRow> history = historyOf(user.userId());
         System.out.println("POINT_DEFECT C-05-2 balance=" + balance + " history=" + history + " error=" + chain(error));
 
-        assertNull(error, chain(error).toString());
-        assertEquals(1100, balance);
-        assertEquals(List.of(new HistoryRow("USE", -100)), history);
+        assertTrue(error instanceof WrongRequestException, chain(error).toString());
+        assertTrue(chainContains(error, "사용할 포인트는 0 이상이어야 합니다."), chain(error).toString());
+        assertEquals(1000, balance);
+        assertEquals(List.of(), history);
     }
 
     @Test

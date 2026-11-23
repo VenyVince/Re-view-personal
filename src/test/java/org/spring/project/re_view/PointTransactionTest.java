@@ -181,6 +181,86 @@ class PointTransactionTest {
         assertEquals(0, outcome.history);
     }
 
+    @Test
+    @DisplayName("C-05-3 0포인트 주문")
+    void zeroPointOrderCreatesOrderWithoutHistory() {
+        UserFixture user = insertUser(1000);
+        int productId = insertProduct(user, 10);
+        int addressId = insertAddress(user);
+        int paymentId = insertPayment(user);
+        Throwable error = call(user, () ->
+                orderService.processOrder(orderWithKeys(user, productId, 0, addressId, paymentId)));
+
+        Outcome outcome = outcome(user, productId, null);
+        Integer usedPoint = usedPointOf(user.userId());
+        System.out.println("POINT_TX C-05-3 point=" + outcome.point
+                + " history=" + outcome.history
+                + " stock=" + outcome.stock
+                + " orders=" + outcome.orders
+                + " usedPoint=" + usedPoint
+                + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertEquals(1000, outcome.point);
+        assertEquals(0, outcome.history);
+        assertEquals(9, outcome.stock);
+        assertEquals(1, outcome.orders);
+        assertEquals(0, usedPoint);
+    }
+
+    @Test
+    @DisplayName("C-05-4 음수 포인트 주문")
+    void negativePointOrderIsRejected() {
+        UserFixture user = insertUser(1000);
+        int productId = insertProduct(user, 10);
+        int addressId = insertAddress(user);
+        int paymentId = insertPayment(user);
+        Throwable error = call(user, () ->
+                orderService.processOrder(orderWithKeys(user, productId, -100, addressId, paymentId)));
+
+        Outcome outcome = outcome(user, productId, null);
+        System.out.println("POINT_TX C-05-4 point=" + outcome.point
+                + " history=" + outcome.history
+                + " stock=" + outcome.stock
+                + " orders=" + outcome.orders
+                + " error=" + chain(error));
+
+        assertTrue(error instanceof WrongRequestException, chain(error).toString());
+        assertTrue(chainContains(error, "사용할 포인트는 0 이상이어야 합니다."), chain(error).toString());
+        assertEquals(1000, outcome.point);
+        assertEquals(0, outcome.history);
+        assertEquals(10, outcome.stock);
+        assertEquals(0, outcome.orders);
+    }
+
+    @Test
+    @DisplayName("C-05-5 양수 포인트 주문")
+    void positivePointOrderDeductsAndRecordsHistory() {
+        UserFixture user = insertUser(1000);
+        int productId = insertProduct(user, 10);
+        int addressId = insertAddress(user);
+        int paymentId = insertPayment(user);
+        Throwable error = call(user, () ->
+                orderService.processOrder(orderWithKeys(user, productId, 100, addressId, paymentId)));
+
+        Outcome outcome = outcome(user, productId, null);
+        List<HistoryDetail> history = historyDetails(user.userId());
+        Integer usedPoint = usedPointOf(user.userId());
+        System.out.println("POINT_TX C-05-5 point=" + outcome.point
+                + " history=" + history
+                + " stock=" + outcome.stock
+                + " orders=" + outcome.orders
+                + " usedPoint=" + usedPoint
+                + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertEquals(900, outcome.point);
+        assertEquals(List.of(new HistoryDetail("USE", 100, "물품 구매로 인한 차감")), history);
+        assertEquals(9, outcome.stock);
+        assertEquals(1, outcome.orders);
+        assertEquals(100, usedPoint);
+    }
+
     private Throwable call(UserFixture user, Runnable action) {
         SecurityContextHolder.clearContext();
         try {
@@ -203,11 +283,16 @@ class PointTransactionTest {
     }
 
     private OrderCreateDTO order(UserFixture user, int productId, int usingPoint, int missingKey) {
+        return orderWithKeys(user, productId, usingPoint, missingKey, missingKey);
+    }
+
+    private OrderCreateDTO orderWithKeys(
+            UserFixture user, int productId, int usingPoint, int addressId, int paymentId) {
         OrderCreateDTO order = new OrderCreateDTO();
         order.setUser_id(user.userId());
         order.setUsing_point(usingPoint);
-        order.setAddress_id(missingKey);
-        order.setPayment_id(missingKey);
+        order.setAddress_id(addressId);
+        order.setPayment_id(paymentId);
         order.setOrder_list(List.of(new OrderDTO(productId, 1)));
         return order;
     }
@@ -246,6 +331,28 @@ class PointTransactionTest {
                 "SELECT product_id FROM product WHERE prd_name = ?", Integer.class, name);
         assertNotNull(productId);
         return productId;
+    }
+
+    private int insertAddress(UserFixture user) {
+        jdbc.update("""
+                INSERT INTO address (user_id, recipient, is_default)
+                VALUES (?, 'tester', '1')
+                """, user.userId());
+        Integer addressId = jdbc.queryForObject(
+                "SELECT MAX(address_id) FROM address WHERE user_id = ?", Integer.class, user.userId());
+        assertNotNull(addressId);
+        return addressId;
+    }
+
+    private int insertPayment(UserFixture user) {
+        jdbc.update("""
+                INSERT INTO payment_methods (user_id, card_company, is_default, is_active)
+                VALUES (?, 'test', '1', '1')
+                """, user.userId());
+        Integer paymentId = jdbc.queryForObject(
+                "SELECT MAX(payment_id) FROM payment_methods WHERE user_id = ?", Integer.class, user.userId());
+        assertNotNull(paymentId);
+        return paymentId;
     }
 
     private int insertReview(UserFixture user, int productId) {
@@ -295,6 +402,21 @@ class PointTransactionTest {
         return count == null ? 0 : count;
     }
 
+    private Integer usedPointOf(int userId) {
+        return jdbc.queryForObject(
+                "SELECT used_point FROM orders WHERE user_id = ?", Integer.class, userId);
+    }
+
+    private List<HistoryDetail> historyDetails(int userId) {
+        return jdbc.query("""
+                SELECT type, amount, description
+                FROM point_history
+                WHERE user_id = ?
+                ORDER BY point_history_id
+                """, (rs, rowNum) -> new HistoryDetail(
+                rs.getString("type"), rs.getInt("amount"), rs.getString("description")), userId);
+    }
+
     private String constraintStatus(String name) {
         return jdbc.queryForObject(
                 "SELECT status FROM user_constraints WHERE constraint_name = ?", String.class, name);
@@ -313,6 +435,8 @@ class PointTransactionTest {
                     )
                     """, userIds);
             deleteIn("DELETE FROM orders WHERE user_id IN (%s)", userIds);
+            deleteIn("DELETE FROM address WHERE user_id IN (%s)", userIds);
+            deleteIn("DELETE FROM payment_methods WHERE user_id IN (%s)", userIds);
             deleteIn("DELETE FROM review WHERE user_id IN (%s)", userIds);
             deleteIn("DELETE FROM user_table WHERE user_id IN (%s)", userIds);
         }
@@ -353,5 +477,8 @@ class PointTransactionTest {
     }
 
     private record Outcome(Integer point, int history, Integer stock, int orders, Timestamp deletedAt) {
+    }
+
+    private record HistoryDetail(String type, int amount, String description) {
     }
 }
