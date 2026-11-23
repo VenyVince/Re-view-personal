@@ -90,35 +90,82 @@ class PointDefectTest {
     }
 
     @Test
-    @DisplayName("C-01 없는 사용자 적립")
-    void earnForMissingUserFollowsCurrentForeignKey() {
+    @DisplayName("C-01-1 존재하지 않는 사용자 포인트 적립")
+    void earnForMissingUserDoesNotWriteHistory() {
         UserFixture actor = insertUser(1000);
         int reviewId = insertReview(actor, 0, null);
         assertEquals(0, count("SELECT COUNT(*) FROM user_table WHERE user_id = ?", MISSING_USER_ID));
         String userForeignKey = constraintStatus("FK_USER_TO_POINT_HISTORY");
+        assertEquals("DISABLED", userForeignKey);
 
         Throwable error = call(actor, () -> pointService.addReviewPoint(MISSING_USER_ID, reviewId));
         int missingUsers = count("SELECT COUNT(*) FROM user_table WHERE user_id = ?", MISSING_USER_ID);
         List<HistoryRow> orphanHistory = historyOf(MISSING_USER_ID);
-        System.out.println("POINT_DEFECT C-01 fk=" + userForeignKey
+        System.out.println("POINT_DEFECT C-01-1 fk=" + userForeignKey
                 + " missingUsers=" + missingUsers
                 + " orphanHistory=" + orphanHistory
                 + " actorPoint=" + pointOf(actor.userId())
+                + " actorHistory=" + historyOf(actor.userId())
                 + " error=" + chain(error));
 
+        assertNotNull(error);
+        assertTrue(error instanceof ResourceNotFoundException, chain(error).toString());
+        assertTrue(chainContains(error, "포인트를 변경할 회원을 찾을 수 없습니다."), chain(error).toString());
         assertEquals(0, missingUsers);
+        assertEquals(List.of(), orphanHistory);
         assertEquals(1000, pointOf(actor.userId()));
-        if ("DISABLED".equals(userForeignKey)) {
-            assertNull(error, chain(error).toString());
-            assertEquals(List.of(new HistoryRow("EARN", 100)), orphanHistory);
-        } else if ("ENABLED".equals(userForeignKey)) {
-            assertNotNull(error);
-            assertTrue(chainContains(error, "ORA-02291") || chainContains(error, "FK_USER_TO_POINT_HISTORY"),
-                    chain(error).toString());
-            assertEquals(List.of(), orphanHistory);
-        } else {
-            fail("확인하지 못한 FK 상태: " + userForeignKey);
-        }
+        assertEquals(List.of(), historyOf(actor.userId()));
+    }
+
+    @Test
+    @DisplayName("C-01-2 존재하는 사용자 정상 적립")
+    void earnForExistingUserUpdatesBalanceAndHistory() {
+        UserFixture user = insertUser(1000);
+        int reviewId = insertReview(user, 0, null);
+        Throwable error = call(user, () -> pointService.addReviewPoint(user.userId(), reviewId));
+        Integer balance = pointOf(user.userId());
+        List<AdminHistory> history = adminHistoryOf(user.userId());
+        System.out.println("POINT_DEFECT C-01-2 balance=" + balance + " history=" + history + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertEquals(1100, balance);
+        assertEquals(List.of(new AdminHistory("EARN", 100, "리뷰 작성 보상")), history);
+    }
+
+    @Test
+    @DisplayName("C-01-3 이력 저장 실패 시 잔액 적립이 롤백된다")
+    void earnRollsBackWhenHistoryInsertFails() {
+        assertEquals("ENABLED", constraintStatus("FK_POINT_HISTORY_REVIEW"));
+        UserFixture user = insertUser(1000);
+        Throwable error = call(user, () -> pointService.addReviewPoint(user.userId(), -1));
+        Integer balance = pointOf(user.userId());
+        List<HistoryRow> history = historyOf(user.userId());
+        System.out.println("POINT_DEFECT C-01-3 balance=" + balance
+                + " history=" + history
+                + " error=" + chain(error));
+
+        assertNotNull(error);
+        assertTrue(error instanceof DatabaseException, chain(error).toString());
+        assertTrue(chainContains(error, "ORA-02291") || chainContains(error, "FK_POINT_HISTORY_REVIEW"),
+                chain(error).toString());
+        assertEquals(1000, balance);
+        assertEquals(List.of(), history);
+    }
+
+    @Test
+    @DisplayName("C-01-4 NULL 잔액 사용자 적립")
+    void earnForNullBalanceTreatsPointAsZero() {
+        UserFixture user = insertUserWithNullPoint();
+        assertNull(pointOf(user.userId()));
+        int reviewId = insertReview(user, 0, null);
+        Throwable error = call(user, () -> pointService.addReviewPoint(user.userId(), reviewId));
+        Integer balance = pointOf(user.userId());
+        List<AdminHistory> history = adminHistoryOf(user.userId());
+        System.out.println("POINT_DEFECT C-01-4 balance=" + balance + " history=" + history + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertEquals(100, balance);
+        assertEquals(List.of(new AdminHistory("EARN", 100, "리뷰 작성 보상")), history);
     }
 
     @Test
@@ -690,6 +737,24 @@ class PointDefectTest {
                 """, baumannId, token, token + "@test.local", point);
         Integer userId = jdbc.queryForObject("SELECT user_id FROM user_table WHERE id = ?", Integer.class, token);
         assertNotNull(userId);
+        return new UserFixture(userId, token, baumannId);
+    }
+
+    private UserFixture insertUserWithNullPoint() {
+        Integer baumannMax = jdbc.queryForObject("SELECT NVL(MAX(baumann_id), 0) FROM baumann", Integer.class);
+        int baumannId = baumannMax + 1;
+        String token = PREFIX + UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO baumann (baumann_id, type, first, second, third, fourth)
+                VALUES (?, ?, 'O', 'R', 'N', 'T')
+                """, baumannId, token);
+        jdbc.update("""
+                INSERT INTO user_table (baumann_id, password, id, name, email, nickname, role)
+                VALUES (?, 'test-only', ?, 'tester', ?, 'ptest', 'USER')
+                """, baumannId, token, token + "@test.local");
+        Integer userId = jdbc.queryForObject("SELECT user_id FROM user_table WHERE id = ?", Integer.class, token);
+        assertNotNull(userId);
+        assertNull(pointOf(userId));
         return new UserFixture(userId, token, baumannId);
     }
 

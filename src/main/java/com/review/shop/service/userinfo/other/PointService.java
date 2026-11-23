@@ -60,7 +60,10 @@ public class PointService {
             throw new WrongRequestException("포인트가 부족합니다.");
         }
 
-        pointMapper.updateUserPoint(user_id, new_point);
+        int affected = pointMapper.updateUserPoint(user_id, new_point);
+        if (affected != 1) {
+            throw new ResourceNotFoundException("포인트를 변경할 회원을 찾을 수 없습니다.");
+        }
 
         PointHistoryDTO response = new PointHistoryDTO();
         response.setUser_id(user_id);
@@ -111,6 +114,8 @@ public class PointService {
             applyUserPointChange(point_history_dto, requireCurrentUser);
             pointMapper.aboutPoint(point_history_dto, review_id);
 
+        } catch (ResourceNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             throw new DatabaseException("포인트 처리 중 DB 오류가 발생했습니다.", e);
         }
@@ -144,6 +149,8 @@ public class PointService {
                 return;
             }
             processPoint(user_id, review_id, PointConstants.BestREVIEW, "EARN", "Best 리뷰 선정 보상", false);
+        } catch (ResourceNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             throw new DatabaseException("Best 리뷰 포인트 적립 중 DB 오류가 발생했습니다.", e);
         }
