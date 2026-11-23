@@ -135,10 +135,11 @@ public class PointService {
     @Transactional
     public void addBestReviewPoint(int user_id, int review_id) {
         try {
-            // 중복 지급 여부
+            pointMapper.selectForUpdate(user_id);
             boolean paid = pointMapper.checkBestReviewPoint(user_id, review_id, PointConstants.BestREVIEW, "EARN");
-            if (paid) return;
-
+            if (paid) {
+                return;
+            }
             processPoint(user_id, review_id, PointConstants.BestREVIEW, "EARN", "Best 리뷰 선정 보상");
         } catch (Exception e) {
             throw new DatabaseException("Best 리뷰 포인트 적립 중 DB 오류가 발생했습니다.", e);

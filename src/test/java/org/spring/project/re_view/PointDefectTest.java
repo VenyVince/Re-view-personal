@@ -158,9 +158,9 @@ class PointDefectTest {
 
             assertTrue(left.success(), "첫 지급 실패: " + left);
             assertTrue(right.success(), "둘째 지급 실패: " + right);
-            assertEquals(2400, balance);
-            assertEquals(List.of(new HistoryRow("EARN", 700), new HistoryRow("EARN", 700)), history);
-            assertEquals(1400, earned);
+            assertEquals(1700, balance);
+            assertEquals(List.of(new HistoryRow("EARN", 700)), history);
+            assertEquals(700, earned);
         } finally {
             release(holder);
             shutdown(executor);
