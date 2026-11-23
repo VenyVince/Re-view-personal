@@ -9,6 +9,8 @@ import com.review.shop.service.admin.AdminReviewService;
 import com.review.shop.service.order.OrderService;
 import com.review.shop.service.review.ProductReviewService;
 import com.review.shop.service.userinfo.other.PointService;
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,21 +19,32 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Each test commits through the real service transaction.
@@ -57,6 +70,9 @@ class PointTransactionTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private DataSource dataSource;
 
     @Autowired
     private Environment environment;
@@ -160,6 +176,127 @@ class PointTransactionTest {
         assertNull(outcome.deletedAt);
         assertEquals(0, outcome.point);
         assertEquals(0, outcome.history);
+    }
+
+    @Test
+    @DisplayName("H-01 본인 리뷰 삭제는 포인트 100을 회수한다")
+    void ownReviewDeleteRecoversPoint() {
+        UserFixture user = insertUser(200);
+        int productId = insertProduct(user, 10);
+        int reviewId = insertReview(user, productId);
+        Throwable error = call(user, () ->
+                productReviewService.deleteReviewWithPenalty(productId, user.userId(), reviewId));
+
+        Outcome outcome = outcome(user, productId, reviewId);
+        List<HistoryDetail> history = historyDetails(user.userId());
+        System.out.println("POINT_TX H-01 point=" + outcome.point
+                + " history=" + history
+                + " deletedAt=" + outcome.deletedAt
+                + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertNotNull(outcome.deletedAt);
+        assertEquals(100, outcome.point);
+        assertEquals(List.of(new HistoryDetail("USE", 100, "리뷰 삭제로 인한 포인트 회수")), history);
+    }
+
+    @Test
+    @DisplayName("H-02 이미 삭제한 본인 리뷰는 포인트를 다시 회수하지 않는다")
+    void ownReviewDeleteTwiceDoesNotRecoverAgain() {
+        UserFixture user = insertUser(200);
+        int productId = insertProduct(user, 10);
+        int reviewId = insertReview(user, productId);
+        Throwable first = call(user, () ->
+                productReviewService.deleteReviewWithPenalty(productId, user.userId(), reviewId));
+        Timestamp deletedAt = outcome(user, productId, reviewId).deletedAt();
+        Throwable second = call(user, () ->
+                productReviewService.deleteReviewWithPenalty(productId, user.userId(), reviewId));
+
+        Outcome outcome = outcome(user, productId, reviewId);
+        List<HistoryDetail> history = historyDetails(user.userId());
+        System.out.println("POINT_TX H-02 point=" + outcome.point
+                + " history=" + history
+                + " deletedAt=" + outcome.deletedAt
+                + " first=" + chain(first)
+                + " second=" + chain(second));
+
+        assertNull(first, chain(first).toString());
+        assertTrue(second instanceof WrongRequestException, chain(second).toString());
+        assertTrue(chainContains(second, "존재하지 않거나 이미 삭제된 리뷰입니다"), chain(second).toString());
+        assertNotNull(outcome.deletedAt);
+        assertEquals(deletedAt, outcome.deletedAt);
+        assertEquals(100, outcome.point);
+        assertEquals(List.of(new HistoryDetail("USE", 100, "리뷰 삭제로 인한 포인트 회수")), history);
+    }
+
+    @Test
+    @DisplayName("H-04 같은 리뷰를 동시에 삭제하면 포인트는 한 번만 회수된다")
+    void concurrentOwnDeletesRecoverPointOnce() throws Exception {
+        UserFixture user = insertUser(200);
+        int productId = insertProduct(user, 10);
+        int reviewId = insertReview(user, productId);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        Connection holder = dataSource.getConnection();
+        holder.setAutoCommit(false);
+        try {
+            lockReview(holder, reviewId);
+            Future<Throwable> first = executor.submit(() -> call(user, () ->
+                    productReviewService.deleteReviewWithPenalty(productId, user.userId(), reviewId)));
+            Future<Throwable> second = executor.submit(() -> call(user, () ->
+                    productReviewService.deleteReviewWithPenalty(productId, user.userId(), reviewId)));
+            assertTrue(waitUntilBothWaitOnReview(first, second, user.userId(), reviewId),
+                    "두 삭제가 리뷰 행 잠금에서 대기하지 않았습니다.");
+            holder.rollback();
+
+            Throwable firstError = first.get(20, TimeUnit.SECONDS);
+            Throwable secondError = second.get(20, TimeUnit.SECONDS);
+            Outcome outcome = outcome(user, productId, reviewId);
+            List<HistoryDetail> history = historyDetails(user.userId());
+            System.out.println("POINT_TX H-04 point=" + outcome.point
+                    + " history=" + history
+                    + " deletedAt=" + outcome.deletedAt
+                    + " first=" + chain(firstError)
+                    + " second=" + chain(secondError));
+
+            boolean firstWon = firstError == null;
+            boolean secondWon = secondError == null;
+            assertTrue(firstWon ^ secondWon, "성공은 한 건이어야 합니다. first="
+                    + chain(firstError) + " second=" + chain(secondError));
+            Throwable failure = firstWon ? secondError : firstError;
+            assertTrue(failure instanceof WrongRequestException, chain(failure).toString());
+            assertTrue(chainContains(failure, "존재하지 않거나 이미 삭제된 리뷰입니다"), chain(failure).toString());
+            assertNotNull(outcome.deletedAt);
+            assertEquals(100, outcome.point);
+            assertEquals(List.of(new HistoryDetail("USE", 100, "리뷰 삭제로 인한 포인트 회수")), history);
+        } finally {
+            release(holder);
+            shutdown(executor);
+        }
+    }
+
+    @Test
+    @DisplayName("H-05 다른 사용자는 리뷰를 삭제하지 못한다")
+    void otherUserCannotDeleteReview() {
+        UserFixture owner = insertUser(200);
+        UserFixture other = insertUser(200);
+        int productId = insertProduct(owner, 10);
+        int reviewId = insertReview(owner, productId);
+        Throwable error = call(other, () ->
+                productReviewService.deleteReviewWithPenalty(productId, other.userId(), reviewId));
+
+        Outcome outcome = outcome(owner, productId, reviewId);
+        System.out.println("POINT_TX H-05 point=" + outcome.point
+                + " history=" + outcome.history
+                + " deletedAt=" + outcome.deletedAt
+                + " error=" + chain(error));
+
+        assertTrue(error instanceof WrongRequestException, chain(error).toString());
+        assertTrue(chainContains(error, "본인의 리뷰만 삭제할 수 있습니다"), chain(error).toString());
+        assertNull(outcome.deletedAt);
+        assertEquals(200, outcome.point);
+        assertEquals(0, outcome.history);
+        assertEquals(200, pointOf(other.userId()));
+        assertEquals(0, historyCount(other.userId()));
     }
 
     @Test
@@ -468,6 +605,91 @@ class PointTransactionTest {
     private String constraintStatus(String name) {
         return jdbc.queryForObject(
                 "SELECT status FROM user_constraints WHERE constraint_name = ?", String.class, name);
+    }
+
+    private void lockReview(Connection holder, int reviewId) throws SQLException {
+        try (PreparedStatement statement = holder.prepareStatement(
+                "SELECT review_id FROM review WHERE review_id = ? FOR UPDATE")) {
+            statement.setInt(1, reviewId);
+            try (ResultSet rows = statement.executeQuery()) {
+                assertTrue(rows.next(), "잠글 리뷰 행이 없습니다.");
+            }
+        }
+    }
+
+    private boolean waitUntilBothWaitOnReview(Future<?> first, Future<?> second, int userId, int reviewId)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            if (first.isDone() || second.isDone()) {
+                return false;
+            }
+            boolean waitingOnRow = activeConnections() >= 3
+                    && threadsWaitingForConnection() == 0
+                    && deletedAtOf(reviewId) == null
+                    && historyCount(userId) == 0;
+            if (waitingOnRow) {
+                Thread.sleep(500);
+                return !first.isDone() && !second.isDone()
+                        && deletedAtOf(reviewId) == null
+                        && historyCount(userId) == 0;
+            }
+            Thread.sleep(50);
+        }
+        return false;
+    }
+
+    private Timestamp deletedAtOf(int reviewId) {
+        return jdbc.queryForObject(
+                "SELECT deleted_at FROM review WHERE review_id = ?", Timestamp.class, reviewId);
+    }
+
+    private int activeConnections() {
+        HikariPoolMXBean pool = hikari().getHikariPoolMXBean();
+        assertNotNull(pool);
+        return pool.getActiveConnections();
+    }
+
+    private int threadsWaitingForConnection() {
+        return hikari().getHikariPoolMXBean().getThreadsAwaitingConnection();
+    }
+
+    private HikariDataSource hikari() {
+        DataSource current = dataSource;
+        if (current instanceof DelegatingDataSource delegating) {
+            current = delegating.getTargetDataSource();
+        }
+        if (current instanceof HikariDataSource hikari) {
+            return hikari;
+        }
+        fail("Hikari 풀이 아닙니다: " + current.getClass().getName());
+        return null;
+    }
+
+    private void release(Connection holder) {
+        if (holder == null) {
+            return;
+        }
+        try {
+            holder.rollback();
+        } catch (SQLException ignored) {
+            // The connection is closed below even if rollback fails.
+        }
+        try {
+            holder.close();
+        } catch (SQLException ignored) {
+            // Closing returns the connection to the pool.
+        }
+    }
+
+    private void shutdown(ExecutorService executor) {
+        executor.shutdownNow();
+        try {
+            assertTrue(executor.awaitTermination(20, TimeUnit.SECONDS), "서비스 스레드가 종료되지 않았습니다.");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            fail("스레드 정리 중 인터럽트가 발생했습니다.");
+        }
     }
 
     private void deleteByPrefix() {

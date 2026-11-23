@@ -124,6 +124,7 @@
         UPDATE review
         SET deleted_at = SYSDATE
         WHERE review_id = #{review_id}
+          AND deleted_at IS NULL
     </update>
 
     <!-- 상품 평점 = 활성 리뷰 평균, 리뷰 수 = 활성 리뷰 건수 -->
