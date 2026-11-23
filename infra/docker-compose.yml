@@ -50,3 +50,24 @@ services:
     depends_on:
       - be
     restart: always
+
+  review-test-db:
+    image: gvenzl/oracle-xe:latest
+    container_name: review-test-db
+    ports:
+      - "1522:1521"
+    env_file:
+      - .env.test
+    environment:
+      ORACLE_DATABASE: REVIEWTEST
+      APP_USER: REVIEW_TEST
+    volumes:
+      - ~/volumes/oracle-test-data:/opt/oracle/oradata
+      - ../src/test/resources/db/schema.sql:/container-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "REVIEWTEST"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+    restart: "no"
