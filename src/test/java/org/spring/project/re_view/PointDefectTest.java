@@ -49,6 +49,7 @@ class PointDefectTest {
 
     private static final String PREFIX = "point-defect-";
     private static final int MISSING_USER_ID = -1;
+    private static final String ADMIN_HISTORY_PROBE = "CHK_C04_ADMIN_HIST_TEST";
 
     @Autowired
     private PointService pointService;
@@ -78,11 +79,13 @@ class PointDefectTest {
         String normalizedUrl = url.toLowerCase();
         assertTrue(normalizedUrl.contains(":1522") && normalizedUrl.contains("/reviewtest"), url);
         assertFalse(normalizedUrl.contains(":1521") || normalizedUrl.contains("xepdb1"), url);
+        dropAdminHistoryProbe();
         assertEquals("REVIEW_TEST", username);
     }
 
     @AfterEach
     void removeRowsCreatedByThisClass() {
+        dropAdminHistoryProbe();
         deleteByPrefix();
     }
 
@@ -298,8 +301,8 @@ class PointDefectTest {
     }
 
     @Test
-    @DisplayName("C-04 관리자 절대값이 차감을 덮어쓴다")
-    void adminAbsoluteWriteOverwritesCommittedUse() {
+    @DisplayName("C-04 오래된 기준 잔액은 거절된다")
+    void adminStaleExpectedPointsIsRejected() {
         UserFixture user = insertUser(1000);
         int readByAdmin = callValue(user, () -> adminUserService.getMemberPoints(user.userId()));
         assertEquals(1000, readByAdmin);
@@ -311,7 +314,8 @@ class PointDefectTest {
         assertEquals(300, balanceAfterUse);
         assertEquals(List.of(new HistoryRow("USE", 700)), historyAfterUse);
 
-        Throwable adminError = call(user, () -> adminUserService.updateMemberPoints(user.userId(), readByAdmin));
+        Throwable adminError = call(user, () ->
+                adminUserService.updateMemberPoints(user.userId(), readByAdmin, readByAdmin));
         Integer balance = pointOf(user.userId());
         List<HistoryRow> history = historyOf(user.userId());
         System.out.println("POINT_DEFECT C-04 read=" + readByAdmin
@@ -320,9 +324,173 @@ class PointDefectTest {
                 + " history=" + history
                 + " adminError=" + chain(adminError));
 
-        assertNull(adminError, chain(adminError).toString());
-        assertEquals(1000, balance);
+        assertTrue(adminError instanceof WrongRequestException, chain(adminError).toString());
+        assertTrue(chainContains(adminError, "현재 잔액이 요청한 기준 잔액과 다릅니다."), chain(adminError).toString());
+        assertEquals(300, balance);
         assertEquals(List.of(new HistoryRow("USE", 700)), history);
+    }
+
+    @Test
+    @DisplayName("C-04-1 기준 잔액이 맞으면 증가분만큼 적립한다")
+    void adminIncreaseWritesEarnHistory() {
+        UserFixture user = insertUser(1000);
+        Throwable error = call(user, () -> adminUserService.updateMemberPoints(user.userId(), 1000, 1500));
+        System.out.println("POINT_DEFECT C-04-1 balance=" + pointOf(user.userId())
+                + " history=" + adminHistoryOf(user.userId())
+                + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertEquals(1500, pointOf(user.userId()));
+        assertEquals(List.of(new AdminHistory("EARN", 500, "관리자 잔액 수정")), adminHistoryOf(user.userId()));
+    }
+
+    @Test
+    @DisplayName("C-04-2 기준 잔액이 맞으면 감소분만큼 사용 이력을 남긴다")
+    void adminDecreaseWritesUseHistory() {
+        UserFixture user = insertUser(1000);
+        Throwable error = call(user, () -> adminUserService.updateMemberPoints(user.userId(), 1000, 700));
+        System.out.println("POINT_DEFECT C-04-2 balance=" + pointOf(user.userId())
+                + " history=" + adminHistoryOf(user.userId())
+                + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertEquals(700, pointOf(user.userId()));
+        assertEquals(List.of(new AdminHistory("USE", 300, "관리자 잔액 수정")), adminHistoryOf(user.userId()));
+    }
+
+    @Test
+    @DisplayName("C-04-2b 목표 잔액 0은 전액 사용으로 기록한다")
+    void adminCanSetBalanceToZero() {
+        UserFixture user = insertUser(1000);
+        Throwable error = call(user, () -> adminUserService.updateMemberPoints(user.userId(), 1000, 0));
+        System.out.println("POINT_DEFECT C-04-2b balance=" + pointOf(user.userId())
+                + " history=" + adminHistoryOf(user.userId())
+                + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertEquals(0, pointOf(user.userId()));
+        assertEquals(List.of(new AdminHistory("USE", 1000, "관리자 잔액 수정")), adminHistoryOf(user.userId()));
+    }
+
+    @Test
+    @DisplayName("C-04-3 목표 잔액이 같으면 잔액과 이력을 바꾸지 않는다")
+    void adminSameBalanceWritesNothing() {
+        UserFixture user = insertUser(1000);
+        Throwable error = call(user, () -> adminUserService.updateMemberPoints(user.userId(), 1000, 1000));
+        System.out.println("POINT_DEFECT C-04-3 balance=" + pointOf(user.userId())
+                + " history=" + adminHistoryOf(user.userId())
+                + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertEquals(1000, pointOf(user.userId()));
+        assertEquals(List.of(), adminHistoryOf(user.userId()));
+    }
+
+    @Test
+    @DisplayName("C-04-4 음수 목표 잔액은 거절된다")
+    void adminNegativeTargetIsRejected() {
+        UserFixture user = insertUser(1000);
+        Throwable error = call(user, () -> adminUserService.updateMemberPoints(user.userId(), 1000, -100));
+        System.out.println("POINT_DEFECT C-04-4 balance=" + pointOf(user.userId())
+                + " history=" + adminHistoryOf(user.userId())
+                + " error=" + chain(error));
+
+        assertTrue(error instanceof WrongRequestException, chain(error).toString());
+        assertTrue(chainContains(error, "포인트는 0 이상이어야 합니다."), chain(error).toString());
+        assertEquals(1000, pointOf(user.userId()));
+        assertEquals(List.of(), adminHistoryOf(user.userId()));
+    }
+
+    @Test
+    @DisplayName("C-04-5 기준 잔액이 다르면 잔액과 이력을 바꾸지 않는다")
+    void adminMismatchedExpectedPointsIsRejected() {
+        UserFixture user = insertUser(1000);
+        Throwable error = call(user, () -> adminUserService.updateMemberPoints(user.userId(), 700, 1500));
+        System.out.println("POINT_DEFECT C-04-5 balance=" + pointOf(user.userId())
+                + " history=" + adminHistoryOf(user.userId())
+                + " error=" + chain(error));
+
+        assertTrue(error instanceof WrongRequestException, chain(error).toString());
+        assertTrue(chainContains(error, "현재 잔액이 요청한 기준 잔액과 다릅니다."), chain(error).toString());
+        assertEquals(1000, pointOf(user.userId()));
+        assertEquals(List.of(), adminHistoryOf(user.userId()));
+    }
+
+    @Test
+    @DisplayName("C-04-6 이력 저장 실패 시 잔액 수정도 롤백된다")
+    void adminHistoryInsertFailureRollsBalanceBack() {
+        UserFixture user = insertUser(1000);
+        jdbc.execute("""
+                ALTER TABLE point_history ADD CONSTRAINT chk_c04_admin_hist_test
+                CHECK (description IS NULL OR description <> '관리자 잔액 수정')
+                ENABLE NOVALIDATE
+                """);
+        try {
+            Throwable error = call(user, () -> adminUserService.updateMemberPoints(user.userId(), 1000, 1500));
+            Integer balance = pointOf(user.userId());
+            List<AdminHistory> history = adminHistoryOf(user.userId());
+            System.out.println("POINT_DEFECT C-04-6 balance=" + balance
+                    + " history=" + history
+                    + " error=" + chain(error));
+
+            assertNotNull(error);
+            assertTrue(chainContains(error, "ORA-02290") || chainContains(error, "CHK_C04_ADMIN_HIST_TEST"),
+                    chain(error).toString());
+            assertEquals(1000, balance);
+            assertEquals(List.of(), history);
+        } finally {
+            dropAdminHistoryProbe();
+        }
+        Integer leftover = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM user_constraints WHERE constraint_name = ?",
+                Integer.class, ADMIN_HISTORY_PROBE);
+        assertEquals(0, leftover);
+    }
+
+    @Test
+    @DisplayName("C-04-7 같은 기준 잔액의 동시 수정은 하나만 성공한다")
+    void oneOfTwoAdminUpdatesWithTheSameExpectedBalanceSucceeds() throws Exception {
+        UserFixture user = insertUser(1000);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        Connection holder = dataSource.getConnection();
+        holder.setAutoCommit(false);
+        try {
+            lockPoint(holder, user.userId());
+            Future<Throwable> increase = executor.submit(() ->
+                    call(user, () -> adminUserService.updateMemberPoints(user.userId(), 1000, 1500)));
+            Future<Throwable> decrease = executor.submit(() ->
+                    call(user, () -> adminUserService.updateMemberPoints(user.userId(), 1000, 700)));
+            assertTrue(waitUntilBothWaitOnUserLock(increase, decrease, user.userId()),
+                    "두 요청이 사용자 행 잠금에서 대기하지 않았습니다.");
+            holder.rollback();
+
+            Throwable increaseError = increase.get(20, TimeUnit.SECONDS);
+            Throwable decreaseError = decrease.get(20, TimeUnit.SECONDS);
+            Integer balance = pointOf(user.userId());
+            List<AdminHistory> history = adminHistoryOf(user.userId());
+            System.out.println("POINT_DEFECT C-04-7 balance=" + balance
+                    + " history=" + history
+                    + " increaseError=" + chain(increaseError)
+                    + " decreaseError=" + chain(decreaseError));
+
+            boolean increaseWon = increaseError == null;
+            boolean decreaseWon = decreaseError == null;
+            assertTrue(increaseWon ^ decreaseWon, "성공은 한 건이어야 합니다. increase="
+                    + chain(increaseError) + " decrease=" + chain(decreaseError));
+            Throwable failure = increaseWon ? decreaseError : increaseError;
+            assertTrue(failure instanceof WrongRequestException, chain(failure).toString());
+            assertTrue(chainContains(failure, "현재 잔액이 요청한 기준 잔액과 다릅니다."), chain(failure).toString());
+            if (increaseWon) {
+                assertEquals(1500, balance);
+                assertEquals(List.of(new AdminHistory("EARN", 500, "관리자 잔액 수정")), history);
+            } else {
+                assertEquals(700, balance);
+                assertEquals(List.of(new AdminHistory("USE", 300, "관리자 잔액 수정")), history);
+            }
+        } finally {
+            release(holder);
+            shutdown(executor);
+        }
     }
 
     @Test
@@ -436,7 +604,7 @@ class PointDefectTest {
         assertTrue(chainContains(error, "로그인이 필요합니다."), chain(error).toString());
     }
 
-    private boolean waitUntilBothWaitOnUserLock(Future<CallResult> first, Future<CallResult> second, int userId)
+    private boolean waitUntilBothWaitOnUserLock(Future<?> first, Future<?> second, int userId)
             throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline) {
@@ -590,6 +758,25 @@ class PointDefectTest {
                 """, (rs, row) -> new HistoryRow(rs.getString("type"), rs.getInt("amount")), userId);
     }
 
+    private List<AdminHistory> adminHistoryOf(int userId) {
+        return jdbc.query("""
+                SELECT type, amount, description
+                FROM point_history
+                WHERE user_id = ?
+                ORDER BY point_history_id
+                """, (rs, row) -> new AdminHistory(
+                rs.getString("type"), rs.getInt("amount"), rs.getString("description")), userId);
+    }
+
+    private void dropAdminHistoryProbe() {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM user_constraints WHERE constraint_name = ?",
+                Integer.class, ADMIN_HISTORY_PROBE);
+        if (count != null && count > 0) {
+            jdbc.execute("ALTER TABLE point_history DROP CONSTRAINT " + ADMIN_HISTORY_PROBE);
+        }
+    }
+
     private String selected(int reviewId) {
         String value = jdbc.queryForObject(
                 "SELECT is_selected FROM review WHERE review_id = ?", String.class, reviewId);
@@ -717,6 +904,9 @@ class PointDefectTest {
     }
 
     private record HistoryRow(String type, int amount) {
+    }
+
+    private record AdminHistory(String type, int amount, String description) {
     }
 
     private record CallResult(boolean success, Throwable error) {

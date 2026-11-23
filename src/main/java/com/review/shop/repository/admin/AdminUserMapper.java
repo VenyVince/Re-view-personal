@@ -1,5 +1,6 @@
 package com.review.shop.repository.admin;
 
+import com.review.shop.dto.admin.MemberPointRow;
 import com.review.shop.dto.user.UserSummaryDTO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -11,6 +12,8 @@ public interface AdminUserMapper {
     //    포인트
     //포인트 조회
     Integer getMemberPoints(int member_id);
+
+    MemberPointRow lockMemberPoint(@Param("user_id") int user_id);
 
     int updateMemberPoints(@Param("user_id") int user_id, @Param("points") Integer points);
 
