@@ -7,6 +7,7 @@
         UPDATE REVIEW
         SET DELETED_AT = SYSDATE
         WHERE REVIEW_ID = #{review_id}
+          AND DELETED_AT IS NULL
     </update>
 
     <update id="setReviewSelection">

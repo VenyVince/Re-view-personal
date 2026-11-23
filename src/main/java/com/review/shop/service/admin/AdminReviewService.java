@@ -23,6 +23,7 @@ public class AdminReviewService {
 
 
     // 리뷰 삭제, soft delete(실제 삭제 안하고 deleted_at만 주입하여 필터링)
+    @Transactional
     public void deleteReview(int review_id) {
         int affected = adminReviewMapper.deleteReview(review_id);
         if (affected == 0) {

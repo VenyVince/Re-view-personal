@@ -3,6 +3,7 @@ package org.spring.project.re_view;
 import com.review.shop.dto.orders.OrderCreateDTO;
 import com.review.shop.dto.orders.OrderDTO;
 import com.review.shop.exception.DatabaseException;
+import com.review.shop.exception.ResourceNotFoundException;
 import com.review.shop.exception.WrongRequestException;
 import com.review.shop.service.admin.AdminReviewService;
 import com.review.shop.service.order.OrderService;
@@ -162,23 +163,70 @@ class PointTransactionTest {
     }
 
     @Test
-    @DisplayName("B-05 운영자 리뷰 삭제는 포인트 회수 실패와 트랜잭션이 분리된다")
-    void adminReviewDeleteKeepsSoftDeleteWhenPointRecoveryFails() {
+    @DisplayName("B-05 운영자 리뷰 삭제의 포인트 회수 실패는 소프트 삭제까지 롤백된다")
+    void adminReviewDeleteRollsBackWhenPointRecoveryFails() {
         UserFixture user = insertUser(0);
         int productId = insertProduct(user, 10);
         int reviewId = insertReview(user, productId);
         Throwable error = call(user, () -> adminReviewService.deleteReview(reviewId));
 
         Outcome outcome = outcome(user, productId, reviewId);
-        System.out.println("POINT_TX B-05 desiredDeletedAt=null actualDeletedAt=" + outcome.deletedAt
-                + " desiredPoint=0 actualPoint=" + outcome.point
-                + " desiredHistory=0 actualHistory=" + outcome.history);
         System.out.println("POINT_TX B-05 exception=" + chain(error));
+        System.out.println("POINT_TX B-05 after point=" + outcome.point
+                + " history=" + outcome.history + " deletedAt=" + outcome.deletedAt);
 
         assertInsufficientPoints(error);
-        assertNotNull(outcome.deletedAt);
+        assertNull(outcome.deletedAt);
         assertEquals(0, outcome.point);
         assertEquals(0, outcome.history);
+    }
+
+    @Test
+    @DisplayName("B-05-1 운영자 리뷰 삭제는 포인트 100을 회수한다")
+    void adminReviewDeleteRecoversPoint() {
+        UserFixture user = insertUser(200);
+        int productId = insertProduct(user, 10);
+        int reviewId = insertReview(user, productId);
+        Throwable error = call(user, () -> adminReviewService.deleteReview(reviewId));
+
+        Outcome outcome = outcome(user, productId, reviewId);
+        List<HistoryDetail> history = historyDetails(user.userId());
+        System.out.println("POINT_TX B-05-1 point=" + outcome.point
+                + " history=" + history
+                + " deletedAt=" + outcome.deletedAt
+                + " error=" + chain(error));
+
+        assertNull(error, chain(error).toString());
+        assertNotNull(outcome.deletedAt);
+        assertEquals(100, outcome.point);
+        assertEquals(List.of(new HistoryDetail("USE", 100, "리뷰 삭제로 인한 포인트 회수")), history);
+    }
+
+    @Test
+    @DisplayName("B-05-2 이미 삭제된 리뷰는 포인트를 다시 회수하지 않는다")
+    void adminReviewDeleteTwiceDoesNotRecoverAgain() {
+        UserFixture user = insertUser(200);
+        int productId = insertProduct(user, 10);
+        int reviewId = insertReview(user, productId);
+        Throwable first = call(user, () -> adminReviewService.deleteReview(reviewId));
+        Timestamp deletedAt = outcome(user, productId, reviewId).deletedAt();
+        Throwable second = call(user, () -> adminReviewService.deleteReview(reviewId));
+
+        Outcome outcome = outcome(user, productId, reviewId);
+        List<HistoryDetail> history = historyDetails(user.userId());
+        System.out.println("POINT_TX B-05-2 point=" + outcome.point
+                + " history=" + history
+                + " deletedAt=" + outcome.deletedAt
+                + " first=" + chain(first)
+                + " second=" + chain(second));
+
+        assertNull(first, chain(first).toString());
+        assertTrue(second instanceof ResourceNotFoundException, chain(second).toString());
+        assertTrue(chainContains(second, "삭제할 리뷰를 찾을 수 없습니다."), chain(second).toString());
+        assertNotNull(outcome.deletedAt);
+        assertEquals(deletedAt, outcome.deletedAt);
+        assertEquals(100, outcome.point);
+        assertEquals(List.of(new HistoryDetail("USE", 100, "리뷰 삭제로 인한 포인트 회수")), history);
     }
 
     @Test
