@@ -1,6 +1,7 @@
 package com.review.shop.service.admin;
 
 import com.review.shop.dto.review.ReviewAdminDTO;
+import com.review.shop.exception.DatabaseException;
 import com.review.shop.exception.ResourceNotFoundException;
 import com.review.shop.exception.WrongRequestException;
 import com.review.shop.repository.admin.AdminReviewMapper;
@@ -22,6 +23,7 @@ public class AdminReviewService {
 
 
     // 리뷰 삭제, soft delete(실제 삭제 안하고 deleted_at만 주입하여 필터링)
+    @Transactional
     public void deleteReview(int review_id) {
         int affected = adminReviewMapper.deleteReview(review_id);
         if (affected == 0) {
@@ -40,11 +42,19 @@ public class AdminReviewService {
         }
         int affected = adminReviewMapper.setReviewSelection(review_id, is_selected);
         if (affected == 0) {
-            throw new ResourceNotFoundException("설정할 리뷰를 찾을 수 없습니다.");
+            String current = adminReviewMapper.findActiveSelection(review_id);
+            if (current == null) {
+                throw new ResourceNotFoundException("설정할 리뷰를 찾을 수 없습니다.");
+            }
+            if (!String.valueOf(is_selected).equals(current.trim())) {
+                throw new DatabaseException("리뷰 채택 상태를 변경하지 못했습니다.");
+            }
+            return;
         }
-        //리뷰 작성자의 user_id 반환
-        int user_id = adminReviewMapper.findReviewer(review_id);
-        pointService.addSelectedReviewPoint(user_id, review_id);
+        if (is_selected == 1) {
+            int user_id = adminReviewMapper.findReviewer(review_id);
+            pointService.addSelectedReviewPoint(user_id, review_id);
+        }
     }
 
     public List<ReviewAdminDTO> getAllReviews() {

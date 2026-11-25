@@ -7,13 +7,23 @@
         UPDATE REVIEW
         SET DELETED_AT = SYSDATE
         WHERE REVIEW_ID = #{review_id}
+          AND DELETED_AT IS NULL
     </update>
 
     <update id="setReviewSelection">
         UPDATE REVIEW
         SET IS_SELECTED = #{is_selected}
         WHERE REVIEW_ID = #{review_id}
+          AND NVL(IS_SELECTED, '0') != CASE #{is_selected} WHEN 1 THEN '1' ELSE '0' END
+          AND DELETED_AT IS NULL
     </update>
+
+    <select id="findActiveSelection" resultType="string">
+        SELECT NVL(IS_SELECTED, '0')
+        FROM REVIEW
+        WHERE REVIEW_ID = #{review_id}
+          AND DELETED_AT IS NULL
+    </select>
 
     <select id="findReviewer" resultType="int">
         select user_id

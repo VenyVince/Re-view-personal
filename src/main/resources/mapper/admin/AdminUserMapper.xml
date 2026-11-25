@@ -10,8 +10,20 @@
         <result property="nickname" column="NICKNAME"/>
     </resultMap>
 
+    <resultMap id="memberPointMap" type="com.review.shop.dto.admin.MemberPointRow">
+        <result property="user_id" column="USER_ID"/>
+        <result property="point" column="POINT"/>
+    </resultMap>
+
     <select id="getMemberPoints" resultType="java.lang.Integer">
         SELECT POINT FROM USER_TABLE WHERE USER_ID = #{menber_id}
+    </select>
+
+    <select id="lockMemberPoint" resultMap="memberPointMap">
+        SELECT USER_ID, POINT
+        FROM USER_TABLE
+        WHERE USER_ID = #{user_id}
+        FOR UPDATE
     </select>
 
     <update id="updateMemberPoints">

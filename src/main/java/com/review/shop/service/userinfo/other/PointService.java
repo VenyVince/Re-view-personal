@@ -30,7 +30,10 @@ public class PointService {
 
     @Transactional
     public void updateUserPoint(PointHistoryDTO dto) {
-        // 1. 유저 포인트 조회 및 잠금
+        applyUserPointChange(dto, true);
+    }
+
+    private void applyUserPointChange(PointHistoryDTO dto, boolean requireCurrentUser) {
         int user_id = dto.getUser_id();
 
         Integer new_point = pointMapper.selectForUpdate(user_id);
@@ -43,31 +46,29 @@ public class PointService {
             new_point -= dto.getAmount();
         }
 
-        String admin = security_util.getCurrentUserRole();
-        if(admin.equals("ADMIN")){
-            if (new_point < 0) {
-                throw new WrongRequestException(user_id+"포인트가 0이하로 내려갑니다.");
+        if (requireCurrentUser) {
+            String admin = security_util.getCurrentUserRole();
+            if(admin.equals("ADMIN")){
+                if (new_point < 0) {
+                    throw new WrongRequestException(user_id+"포인트가 0이하로 내려갑니다.");
+                }
             }
-
-            // 2. 업데이트
-            pointMapper.updateUserPoint(user_id, new_point);
-        }
-        else{
-            if (new_point < 0) {
+            else if (new_point < 0) {
                 throw new WrongRequestException("포인트가 부족합니다.");
             }
-
-            // 2. 업데이트
-            pointMapper.updateUserPoint(user_id, new_point);
+        } else if (new_point < 0) {
+            throw new WrongRequestException("포인트가 부족합니다.");
         }
 
+        int affected = pointMapper.updateUserPoint(user_id, new_point);
+        if (affected != 1) {
+            throw new ResourceNotFoundException("포인트를 변경할 회원을 찾을 수 없습니다.");
+        }
 
-        // 3. 응답 객체 생성
         PointHistoryDTO response = new PointHistoryDTO();
         response.setUser_id(user_id);
         response.setType(dto.getType());
-        response.setAmount(dto.getAmount()); // 새 필드가 있다면 반영
-
+        response.setAmount(dto.getAmount());
     }
 
 
@@ -98,6 +99,11 @@ public class PointService {
 
     // 포인트 적립 시 반복되는 부분 함수로 묶음
     private void processPoint(int user_id, Integer review_id, int amount, String type, String description) {
+        processPoint(user_id, review_id, amount, type, description, true);
+    }
+
+    private void processPoint(
+            int user_id, Integer review_id, int amount, String type, String description, boolean requireCurrentUser) {
         try {
             PointHistoryDTO point_history_dto = new PointHistoryDTO();
             point_history_dto.setUser_id(user_id);
@@ -105,9 +111,11 @@ public class PointService {
             point_history_dto.setType(type);
             point_history_dto.setDescription(description);
 
-            updateUserPoint(point_history_dto);
+            applyUserPointChange(point_history_dto, requireCurrentUser);
             pointMapper.aboutPoint(point_history_dto, review_id);
 
+        } catch (ResourceNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             throw new DatabaseException("포인트 처리 중 DB 오류가 발생했습니다.", e);
         }
@@ -135,11 +143,14 @@ public class PointService {
     @Transactional
     public void addBestReviewPoint(int user_id, int review_id) {
         try {
-            // 중복 지급 여부
+            pointMapper.selectForUpdate(user_id);
             boolean paid = pointMapper.checkBestReviewPoint(user_id, review_id, PointConstants.BestREVIEW, "EARN");
-            if (paid) return;
-
-            processPoint(user_id, review_id, PointConstants.BestREVIEW, "EARN", "Best 리뷰 선정 보상");
+            if (paid) {
+                return;
+            }
+            processPoint(user_id, review_id, PointConstants.BestREVIEW, "EARN", "Best 리뷰 선정 보상", false);
+        } catch (ResourceNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             throw new DatabaseException("Best 리뷰 포인트 적립 중 DB 오류가 발생했습니다.", e);
         }
@@ -148,6 +159,12 @@ public class PointService {
     // 유저의 포인트 사용
     @Transactional
     public void usePoint(int user_id, int use_point) {
+        if (use_point < 0) {
+            throw new WrongRequestException("사용할 포인트는 0 이상이어야 합니다.");
+        }
+        if (use_point == 0) {
+            return;
+        }
         processPoint(user_id, null, use_point, "USE", "물품 구매로 인한 차감");
     }
 

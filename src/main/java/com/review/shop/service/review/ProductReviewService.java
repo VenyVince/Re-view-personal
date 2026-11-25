@@ -260,7 +260,10 @@ public class ProductReviewService {
         }
 
         // Soft Delete
-        productReviewMapper.deleteReview(review_id);
+        int affected = productReviewMapper.deleteReview(review_id);
+        if (affected != 1) {
+            throw new WrongRequestException("존재하지 않거나 이미 삭제된 리뷰입니다");
+        }
 
         // 상품 평점/리뷰 수 재계산 (활성 리뷰 평균)
         productReviewMapper.recalculateProductRating(product_id);

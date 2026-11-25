@@ -1,5 +1,6 @@
 package com.review.shop.controller.admin;
 
+import com.review.shop.dto.admin.AdminPointUpdateRequest;
 import com.review.shop.dto.user.UserSummaryDTO;
 import com.review.shop.exception.WrongRequestException;
 import com.review.shop.service.admin.AdminUserService;
@@ -58,12 +59,14 @@ public class AdminUserController {
     public ResponseEntity<String> updateMemberPoints(
             @Parameter(description = "포인트를 업데이트할 회원의 ID") @PathVariable int
                     user_id,
-            @RequestBody @Schema(example = "{\"points\": 2000}") Map<String, Integer> payload) {
-        Integer points = payload.get("points");
-        if (points == null || points < 0) {
+            @RequestBody AdminPointUpdateRequest request) {
+        if (request == null || request.getPoints() == null || request.getPoints() < 0) {
             throw new WrongRequestException("포인트는 0 이상의 정수여야 합니다.");
         }
-        adminUserService.updateMemberPoints(user_id, points);
+        if (request.getExpected_points() == null || request.getExpected_points() < 0) {
+            throw new WrongRequestException("기준 잔액은 0 이상의 정수여야 합니다.");
+        }
+        adminUserService.updateMemberPoints(user_id, request.getExpected_points(), request.getPoints());
         return ResponseEntity.ok("회원 포인트가 업데이트되었습니다");
     }
 
